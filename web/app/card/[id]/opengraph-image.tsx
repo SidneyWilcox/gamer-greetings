@@ -1,26 +1,26 @@
 import { ImageResponse } from "next/og";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "edge";
-export const alt = "Gamer Card Social Preview";
-export const size = { width: 1200, height: 630 };
+export const runtime = "nodejs";
+export const alt = "Gamer Greetings Card";
+export const size = {
+  width: 1200,
+  height: 630,
+};
 export const contentType = "image/png";
 
-export default async function Image({ params }: { params: Promise<{ id: string }> }) {
+export default async function Image({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
 
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    "https://txprrkhnmfxzmvfvnaal.supabase.co";
-  const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    "sb_publishable_nc6RdPZqPJ_nIecXSvDhuA_R51Xn";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-  // Check if identifier is UUID or vanity slug
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
   let query = supabase.from("gamer_cards").select("*");
   if (isUuid) {
     query = query.eq("id", id);
@@ -30,14 +30,16 @@ export default async function Image({ params }: { params: Promise<{ id: string }
 
   const { data: card } = await query.single();
 
-  const username = card?.username || "ANONYMOUS";
-  const apm = card?.apm ?? 50;
-  const salt = card?.salt ?? 50;
+  const username = card?.username || "GAMER";
+  const powerLevel = card?.power_level ?? 100;
+  const rankTier = card?.rank_tier || "BRONZE NOOB";
+  const classRole = card?.class_role || "DPS";
   const winRate = card?.win_rate ?? 50;
   const clutchRate = card?.clutch_rate ?? 50;
-  const powerLevel = card?.power_level ?? 100;
-  const rankTier = card?.rank_tier ?? "BRONZE NOOB";
-  const role = card?.class_role || "DPS";
+  const hoursPlayed = (card?.hours_played ?? 0).toLocaleString();
+
+  const isApex = powerLevel >= 380;
+  const accentColor = isApex ? "#f43f5e" : "#06b6d4";
 
   return new ImageResponse(
     (
@@ -45,115 +47,159 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         style={{
           width: "100%",
           height: "100%",
-          backgroundColor: "#050505",
-          color: "#ffffff",
           display: "flex",
+          flexDirection: "row",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "space-between",
+          backgroundColor: "#08080c",
+          padding: "60px 80px",
           fontFamily: "sans-serif",
-          padding: "40px",
+          color: "#ffffff",
         }}
       >
+        {/* Left Column: Player Bio & Stats */}
         <div
           style={{
-            width: "1120px",
-            height: "550px",
-            backgroundColor: "#111116",
-            border: "2px solid #06b6d4",
-            borderRadius: "24px",
-            padding: "40px",
             display: "flex",
+            flexDirection: "column",
             justifyContent: "space-between",
-            alignItems: "center",
-            boxShadow: "0 0 50px rgba(6, 182, 212, 0.3)",
+            height: "100%",
+            maxWidth: "650px",
           }}
         >
-          {/* Left Column: Gamer Info & Badges */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1 }}>
-            <div style={{ color: "#666", fontSize: "16px", letterSpacing: "3px" }}>
-              // GAMER_GREETINGS
-            </div>
-            <div style={{ fontSize: "52px", fontWeight: "900", color: "#06b6d4", letterSpacing: "1px" }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span
+              style={{
+                fontSize: 20,
+                color: accentColor,
+                letterSpacing: 4,
+                fontWeight: 700,
+                marginBottom: 10,
+              }}
+            >
+              // GAMER GREETINGS
+            </span>
+            <h1
+              style={{
+                fontSize: 64,
+                fontWeight: 900,
+                letterSpacing: 2,
+                margin: 0,
+                color: "#ffffff",
+              }}
+            >
               {username}
-            </div>
-            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            </h1>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginTop: 15,
+                gap: 12,
+              }}
+            >
               <div
                 style={{
-                  backgroundColor: "rgba(244, 63, 94, 0.2)",
-                  border: "1px solid #f43f5e",
-                  color: "#f43f5e",
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  fontSize: "18px",
-                  fontWeight: "bold",
+                  backgroundColor: "#161622",
+                  border: `2px solid ${accentColor}`,
+                  borderRadius: 8,
+                  padding: "6px 16px",
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: accentColor,
                 }}
               >
-                ⚡ {powerLevel} PWR
+                {classRole}
               </div>
-              <div
-                style={{
-                  backgroundColor: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                  color: "#aaa",
-                }}
-              >
-                {rankTier}
-              </div>
-            </div>
-            <div style={{ fontSize: "20px", color: "#22c55e", fontWeight: "bold", marginTop: "8px" }}>
-              ROLE: {role}
+              <span style={{ fontSize: 20, color: "#8888aa" }}>
+                ⏳ {hoursPlayed} hrs logged
+              </span>
             </div>
           </div>
 
-          {/* Right Column: Core Stat Bars */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px", width: "450px" }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "16px", color: "#aaa", marginBottom: "6px" }}>
-                <span>ACTIONS PER MINUTE (APM)</span>
-                <span style={{ color: "#06b6d4", fontWeight: "bold" }}>{apm}%</span>
-              </div>
-              <div style={{ width: "100%", height: "12px", backgroundColor: "#222", borderRadius: "6px" }}>
-                <div style={{ width: `${apm}%`, height: "100%", backgroundColor: "#06b6d4", borderRadius: "6px" }} />
-              </div>
+          {/* Stats Badges */}
+          <div style={{ display: "flex", gap: 16 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                backgroundColor: "#12121c",
+                border: "1px solid #28283c",
+                borderRadius: 12,
+                padding: "16px 24px",
+              }}
+            >
+              <span style={{ fontSize: 14, color: "#8888aa" }}>WIN RATE</span>
+              <span style={{ fontSize: 32, fontWeight: 900, color: "#22c55e" }}>
+                {winRate}%
+              </span>
             </div>
 
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "16px", color: "#aaa", marginBottom: "6px" }}>
-                <span>WIN RATE</span>
-                <span style={{ color: "#22c55e", fontWeight: "bold" }}>{winRate}%</span>
-              </div>
-              <div style={{ width: "100%", height: "12px", backgroundColor: "#222", borderRadius: "6px" }}>
-                <div style={{ width: `${winRate}%`, height: "100%", backgroundColor: "#22c55e", borderRadius: "6px" }} />
-              </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                backgroundColor: "#12121c",
+                border: "1px solid #28283c",
+                borderRadius: 12,
+                padding: "16px 24px",
+              }}
+            >
+              <span style={{ fontSize: 14, color: "#8888aa" }}>CLUTCH RATE</span>
+              <span style={{ fontSize: 32, fontWeight: 900, color: "#eab308" }}>
+                {clutchRate}%
+              </span>
             </div>
+          </div>
+        </div>
 
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "16px", color: "#aaa", marginBottom: "6px" }}>
-                <span>CLUTCH RATE</span>
-                <span style={{ color: "#eab308", fontWeight: "bold" }}>{clutchRate}%</span>
-              </div>
-              <div style={{ width: "100%", height: "12px", backgroundColor: "#222", borderRadius: "6px" }}>
-                <div style={{ width: `${clutchRate}%`, height: "100%", backgroundColor: "#eab308", borderRadius: "6px" }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "16px", color: "#aaa", marginBottom: "6px" }}>
-                <span>SALT LEVEL</span>
-                <span style={{ color: "#ef4444", fontWeight: "bold" }}>{salt}%</span>
-              </div>
-              <div style={{ width: "100%", height: "12px", backgroundColor: "#222", borderRadius: "6px" }}>
-                <div style={{ width: `${salt}%`, height: "100%", backgroundColor: "#ef4444", borderRadius: "6px" }} />
-              </div>
-            </div>
+        {/* Right Column: Power Badge Box */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#12121c",
+            border: `3px solid ${accentColor}`,
+            borderRadius: 24,
+            padding: "40px 50px",
+            width: "360px",
+            textAlign: "center",
+          }}
+        >
+          <span style={{ fontSize: 16, color: "#8888aa", letterSpacing: 2 }}>
+            POWER LEVEL
+          </span>
+          <span
+            style={{
+              fontSize: 72,
+              fontWeight: 900,
+              color: accentColor,
+              margin: "8px 0",
+            }}
+          >
+            ⚡ {powerLevel}
+          </span>
+          <div
+            style={{
+              backgroundColor: isApex ? "rgba(244,63,94,0.2)" : "#1c1c2a",
+              border: `1px solid ${accentColor}`,
+              borderRadius: 8,
+              padding: "8px 16px",
+              fontSize: 16,
+              fontWeight: 800,
+              color: "#ffffff",
+              marginTop: 10,
+            }}
+          >
+            {rankTier}
           </div>
         </div>
       </div>
     ),
-    { ...size }
+    {
+      ...size,
+    }
   );
 }
