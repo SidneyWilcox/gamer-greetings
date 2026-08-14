@@ -34,6 +34,7 @@ interface GamerCard {
   steam_handle?: string;
   twitch_handle?: string;
   created_at?: string;
+  is_pro?: boolean;
 }
 
 const CLASS_ROLES = [
@@ -133,6 +134,7 @@ export default function Home() {
   const [classRole, setClassRole] = useState("DPS");
   const [mainGame, setMainGame] = useState("Valorant");
   const [selectedPerks, setSelectedPerks] = useState<string[]>(["headshot", "movement"]);
+  const [proSkin, setProSkin] = useState<"standard" | "obsidian" | "gold" | "matrix">("standard");
 
   const [isFlipped, setIsFlipped] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
@@ -195,6 +197,7 @@ export default function Home() {
         if (d.classRole !== undefined) setClassRole(d.classRole);
         if (d.mainGame !== undefined) setMainGame(d.mainGame);
         if (d.selectedPerks !== undefined) setSelectedPerks(d.selectedPerks);
+        if (d.proSkin !== undefined) setProSkin(d.proSkin);
         if (d.discord !== undefined) setDiscord(d.discord);
         if (d.psn !== undefined) setPsn(d.psn);
         if (d.xbox !== undefined) setXbox(d.xbox);
@@ -214,16 +217,17 @@ export default function Home() {
     const draft = {
       username, vanitySlug, bio, gpu, hz, dpi,
       apm, luck, salt, tiltRes, winRate, clutchRate, hoursPlayed,
-      avatarUrl, classRole, mainGame, selectedPerks,
+      avatarUrl, classRole, mainGame, selectedPerks, proSkin,
       discord, psn, xbox, steam, twitch
     };
     localStorage.setItem("gg_card_draft", JSON.stringify(draft));
-  }, [isDraftLoaded, username, vanitySlug, bio, gpu, hz, dpi, apm, luck, salt, tiltRes, winRate, clutchRate, hoursPlayed, avatarUrl, classRole, mainGame, selectedPerks, discord, psn, xbox, steam, twitch]);
+  }, [isDraftLoaded, username, vanitySlug, bio, gpu, hz, dpi, apm, luck, salt, tiltRes, winRate, clutchRate, hoursPlayed, avatarUrl, classRole, mainGame, selectedPerks, proSkin, discord, psn, xbox, steam, twitch]);
 
   const { powerLevel, rankTier, isHolo } = useMemo(() => {
     const hoursBonus = Math.min(Math.floor(Math.sqrt(hoursPlayed) * 2), 60);
     const perkBonus = selectedPerks.length * 10;
-    const score = Math.round((apm * 1.3) + (winRate * 1.6) + (clutchRate * 1.1) + (tiltRes * 0.4) + hoursBonus + perkBonus);
+    const proSkinBonus = proSkin !== "standard" ? 15 : 0;
+    const score = Math.round((apm * 1.3) + (winRate * 1.6) + (clutchRate * 1.1) + (tiltRes * 0.4) + hoursBonus + perkBonus + proSkinBonus);
     
     let tier = "BRONZE NOOB";
     if (score >= 400) tier = "🔥 APEX PREDATOR (S-TIER)";
@@ -232,7 +236,7 @@ export default function Home() {
     else if (score >= 140) tier = "🥈 SILVER GRINDER";
 
     return { powerLevel: score, rankTier: tier, isHolo: score >= 400 };
-  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed, selectedPerks]);
+  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed, selectedPerks, proSkin]);
 
   useEffect(() => {
     if (isHolo && !prevHoloRef.current) {
@@ -275,7 +279,31 @@ export default function Home() {
     badge: null as string | null,
   };
 
-  if (salt > 80) {
+  if (proSkin === "obsidian") {
+    theme = {
+      bg: "#040407",
+      border: "2px solid #a855f7",
+      glow: "0 0 40px rgba(168, 85, 247, 0.6)",
+      accent: "#a855f7",
+      badge: "🔮 OBSIDIAN PRO",
+    };
+  } else if (proSkin === "gold") {
+    theme = {
+      bg: "#080602",
+      border: "2px solid #eab308",
+      glow: "0 0 40px rgba(234, 179, 8, 0.6)",
+      accent: "#eab308",
+      badge: "👑 24K GOLD PRO",
+    };
+  } else if (proSkin === "matrix") {
+    theme = {
+      bg: "#020803",
+      border: "2px solid #22c55e",
+      glow: "0 0 40px rgba(34, 197, 94, 0.6)",
+      accent: "#22c55e",
+      badge: "🟩 MATRIX CYBER",
+    };
+  } else if (salt > 80) {
     themeName = "glitch";
     theme = {
       bg: "#080202",
@@ -392,6 +420,7 @@ export default function Home() {
       xbox_handle: xbox || undefined,
       steam_handle: steam || undefined,
       twitch_handle: twitch || undefined,
+      is_pro: proSkin !== "standard",
     };
 
     const { error } = await supabase.from("gamer_cards").insert([newCard]);
@@ -433,6 +462,7 @@ export default function Home() {
       class_role: classRole,
       main_game: mainGame,
       perks: selectedPerks,
+      is_pro: proSkin !== "standard",
     };
 
     const updated = [target, ...collection.filter((c) => c.username !== target.username)];
@@ -710,7 +740,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ================= STAT CLASH DUEL ARENA MODAL ================= */}
+      {/* STAT CLASH DUEL ARENA MODAL */}
       {duelOpponent && (
         <div
           style={{
@@ -752,7 +782,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Fighter Names & Champion Outcome */}
             <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center", marginBottom: "20px" }}>
               <div style={{ textAlign: "center", flex: 1 }}>
                 <h3 style={{ fontSize: "18px", margin: 0, color: "#06b6d4", fontWeight: "900" }}>{username}</h3>
@@ -778,7 +807,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Overall Champion Banner */}
             <div
               style={{
                 width: "100%",
@@ -797,7 +825,6 @@ export default function Home() {
               👑 OVERALL WINNER: {powerLevel >= (duelOpponent.power_level ?? 100) ? username : duelOpponent.username}
             </div>
 
-            {/* Stat Row Comparison Matrix */}
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
               {[
                 { name: "POWER LEVEL", p1: powerLevel, p2: duelOpponent.power_level ?? 100, unit: "⚡" },
@@ -917,6 +944,42 @@ export default function Home() {
                   boxSizing: "border-box",
                 }}
               />
+            </div>
+          </div>
+
+          {/* Premium Skin Customizer */}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
+              COLLECTOR CARD THEME / SKIN
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+              {[
+                { id: "standard" as const, label: "Standard Cyber", col: "#06b6d4" },
+                { id: "obsidian" as const, label: "🔮 Obsidian Void", col: "#a855f7" },
+                { id: "gold" as const, label: "👑 24K Gold Foil", col: "#eab308" },
+                { id: "matrix" as const, label: "🟩 Matrix Cyber", col: "#22c55e" },
+              ].map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setProSkin(s.id);
+                    sound.playTick(75);
+                  }}
+                  style={{
+                    backgroundColor: proSkin === s.id ? `${s.col}22` : "#1b1b24",
+                    border: proSkin === s.id ? `2px solid ${s.col}` : "1px solid #282836",
+                    color: proSkin === s.id ? s.col : "#aaa",
+                    borderRadius: "6px",
+                    padding: "6px 8px",
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    textAlign: "center",
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1139,7 +1202,7 @@ export default function Home() {
             />
           </div>
 
-          {/* Hardware Specs */}
+          {/* Hardware Specs Accordion */}
           <button
             onClick={() => {
               setShowHardware(!showHardware);
@@ -1191,7 +1254,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Gamer Handles */}
+          {/* Gamer Handles Accordion */}
           <button
             onClick={() => {
               setShowHandles(!showHandles);
@@ -1245,7 +1308,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* QR Toggle */}
+          {/* QR Code Toggle */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", backgroundColor: "#171720", padding: "8px 12px", borderRadius: "8px" }}>
             <span style={{ fontSize: "11px", color: "#aaa" }}>SHOW SCANNABLE QR CODE</span>
             <input
@@ -1259,7 +1322,7 @@ export default function Home() {
             />
           </div>
 
-          {/* Action Buttons */}
+          {/* Main Action Buttons */}
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "12px" }}>
             <button
               onClick={handleSaveToLeaderboard}
@@ -1314,6 +1377,91 @@ export default function Home() {
             >
               {isExporting ? "EXPORTING..." : "DOWNLOAD CARD PNG"}
             </button>
+          </div>
+
+          {/* Storefront & Monetization Upgrades */}
+          <div
+            style={{
+              backgroundColor: "#161624",
+              border: "1px solid #f43f5e88",
+              borderRadius: "12px",
+              padding: "16px",
+              marginTop: "20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              boxShadow: "0 0 20px rgba(244, 63, 94, 0.15)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "11px", fontWeight: "900", color: "#f43f5e", letterSpacing: "1.5px" }}>
+                👑 PRO UPGRADES & MERCH
+              </span>
+              <span style={{ fontSize: "9px", backgroundColor: "#f43f5e22", color: "#f43f5e", padding: "2px 6px", borderRadius: "4px", fontWeight: "bold" }}>
+                OFFICIAL STORE
+              </span>
+            </div>
+
+            {/* Digital Pro Pass */}
+            <a
+              href="https://buy.stripe.com/bJe28kgZs51uaXOcPVefC01"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "#e11d48",
+                color: "#fff",
+                textDecoration: "none",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                fontWeight: "800",
+                fontSize: "12px",
+                letterSpacing: "0.5px",
+                boxShadow: "0 0 15px rgba(225, 29, 72, 0.4)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>⚡</span>
+                <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+                  <span>UNLOCK DIGITAL PRO PASS</span>
+                  <span style={{ fontSize: "9px", opacity: 0.85, fontWeight: "normal" }}>Obsidian, 24K Gold, Matrix Themes & Verified Crest</span>
+                </div>
+              </div>
+              <span style={{ fontSize: "13px", fontWeight: "900" }}>$3.99</span>
+            </a>
+
+            {/* Physical Holo Card */}
+            <a
+              href="https://buy.stripe.com/dRmdR2aB4ctWaXO17defC03"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                backgroundColor: "#1f1f2e",
+                border: "1px solid #06b6d4",
+                color: "#06b6d4",
+                textDecoration: "none",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                fontWeight: "800",
+                fontSize: "12px",
+                letterSpacing: "0.5px",
+                boxShadow: "0 0 15px rgba(6, 182, 212, 0.2)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>📦</span>
+                <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+                  <span>ORDER PHYSICAL HOLO CARD</span>
+                  <span style={{ fontSize: "9px", opacity: 0.85, fontWeight: "normal" }}>Custom Foil Print + Tap-to-Profile NFC Chip</span>
+                </div>
+              </div>
+              <span style={{ fontSize: "13px", fontWeight: "900" }}>$24.99</span>
+            </a>
           </div>
         </div>
 
@@ -1823,6 +1971,11 @@ export default function Home() {
                         {card.main_game && (
                           <span style={{ fontSize: "9px", backgroundColor: "rgba(6,182,212,0.15)", color: "#06b6d4", padding: "2px 6px", borderRadius: "4px" }}>
                             🎮 {card.main_game}
+                          </span>
+                        )}
+                        {card.is_pro && (
+                          <span style={{ fontSize: "8px", backgroundColor: "rgba(244,63,94,0.2)", color: "#f43f5e", border: "1px solid #f43f5e", padding: "1px 4px", borderRadius: "3px", fontWeight: "bold" }}>
+                            PRO
                           </span>
                         )}
                       </div>
