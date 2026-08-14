@@ -9,6 +9,10 @@ interface GamerCard {
   id?: string;
   slug?: string;
   username: string;
+  bio?: string;
+  hardware_gpu?: string;
+  hardware_hz?: string;
+  hardware_dpi?: string;
   apm: number;
   luck: number;
   salt: number;
@@ -22,6 +26,8 @@ interface GamerCard {
   theme: string;
   avatar_url?: string;
   class_role?: string;
+  main_game?: string;
+  perks?: string[];
   discord_handle?: string;
   psn_handle?: string;
   xbox_handle?: string;
@@ -36,6 +42,31 @@ const CLASS_ROLES = [
   { id: "SUPPORT", label: "💚 MEDIC / SUPPORT", color: "#22c55e" },
   { id: "IGL", label: "👑 IGL / SHOTCALLER", color: "#eab308" },
   { id: "RUNNER", label: "⚡ SPEEDRUNNER", color: "#a855f7" },
+];
+
+const POPULAR_GAMES = [
+  "Valorant",
+  "Apex Legends",
+  "Marvel Rivals",
+  "Call of Duty: Warzone",
+  "Street Fighter 6",
+  "Tekken 8",
+  "Cyberpunk 2077",
+  "Elden Ring",
+  "Overwatch 2",
+  "Rocket League",
+  "Fortnite",
+  "Counter-Strike 2",
+];
+
+const AVAILABLE_PERKS = [
+  { id: "headshot", label: "🎯 Headshot Machine", color: "#ef4444" },
+  { id: "grinder", label: "☕ Late Night Grinder", color: "#c084fc" },
+  { id: "openmic", label: "🎙️ Open Mic Demon", color: "#f97316" },
+  { id: "anchor", label: "🛡️ Anchor Main", color: "#3b82f6" },
+  { id: "igl", label: "🧠 Big Brain IGL", color: "#eab308" },
+  { id: "movement", label: "⚡ Movement God", color: "#06b6d4" },
+  { id: "snack", label: "🍕 Snack & Frag", color: "#22c55e" },
 ];
 
 const PRESET_AVATARS = [
@@ -53,7 +84,6 @@ const LEADERBOARD_CATEGORIES = [
   { id: "hours_played", label: "⏳ HOURS" },
 ];
 
-// Stat Title Evaluator
 function getStatTitle(type: "apm" | "luck" | "salt" | "tiltRes", val: number): string {
   if (type === "apm") {
     if (val > 80) return "Keyboard Shredder";
@@ -78,11 +108,19 @@ function getStatTitle(type: "apm" | "luck" | "salt" | "tiltRes", val: number): s
   return "";
 }
 
+const sanitizeHandle = (val: string) => val.replace(/^@+/, "").trim();
+
 export default function Home() {
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+
   const [username, setUsername] = useState("PLAYER_ONE");
   const [vanitySlug, setVanitySlug] = useState("");
+  const [bio, setBio] = useState("Clutch or kick. Always clicking heads.");
 
-  // Stats State
+  const [gpu, setGpu] = useState("RTX 3070");
+  const [hz, setHz] = useState("240Hz");
+  const [dpi, setDpi] = useState("800 DPI");
+
   const [apm, setApm] = useState(65);
   const [luck, setLuck] = useState(50);
   const [salt, setSalt] = useState(40);
@@ -93,8 +131,10 @@ export default function Home() {
 
   const [avatarUrl, setAvatarUrl] = useState(PRESET_AVATARS[0]);
   const [classRole, setClassRole] = useState("DPS");
+  const [mainGame, setMainGame] = useState("Valorant");
+  const [selectedPerks, setSelectedPerks] = useState<string[]>(["headshot", "movement"]);
 
-  // Audio & Toggles
+  const [isFlipped, setIsFlipped] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
   const [discord, setDiscord] = useState("");
   const [psn, setPsn] = useState("");
@@ -102,13 +142,15 @@ export default function Home() {
   const [steam, setSteam] = useState("");
   const [twitch, setTwitch] = useState("");
   const [showHandles, setShowHandles] = useState(false);
+  const [showHardware, setShowHardware] = useState(false);
   const [showQrCode, setShowQrCode] = useState(true);
 
-  // Deck / Binder Collection State
+  // Collection & Duel Arena State
   const [collection, setCollection] = useState<GamerCard[]>([]);
   const [isBinderOpen, setIsBinderOpen] = useState(false);
+  const [duelOpponent, setDuelOpponent] = useState<GamerCard | null>(null);
 
-  // Leaderboard Filtering & Sorting State
+  // Leaderboard Filtering State
   const [activeCategory, setActiveCategory] = useState("power_level");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [leaderboard, setLeaderboard] = useState<GamerCard[]>([]);
@@ -116,8 +158,9 @@ export default function Home() {
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedEmbed, setCopiedEmbed] = useState(false);
 
-  // 3D Parallax Tilt & Active Hover State
+  // 3D Tilt State
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
   const [isHovered, setIsHovered] = useState(false);
@@ -126,20 +169,61 @@ export default function Home() {
   const cardWrapperRef = useRef<HTMLDivElement>(null);
   const prevHoloRef = useRef(false);
 
-  // Load Saved Binder Collection from LocalStorage
+  // Load Saved Drafts on Mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("gg_card_collection");
-      if (saved) setCollection(JSON.parse(saved));
+      const savedBinder = localStorage.getItem("gg_card_collection");
+      if (savedBinder) setCollection(JSON.parse(savedBinder));
+
+      const savedDraft = localStorage.getItem("gg_card_draft");
+      if (savedDraft) {
+        const d = JSON.parse(savedDraft);
+        if (d.username !== undefined) setUsername(d.username);
+        if (d.vanitySlug !== undefined) setVanitySlug(d.vanitySlug);
+        if (d.bio !== undefined) setBio(d.bio);
+        if (d.gpu !== undefined) setGpu(d.gpu);
+        if (d.hz !== undefined) setHz(d.hz);
+        if (d.dpi !== undefined) setDpi(d.dpi);
+        if (d.apm !== undefined) setApm(d.apm);
+        if (d.luck !== undefined) setLuck(d.luck);
+        if (d.salt !== undefined) setSalt(d.salt);
+        if (d.tiltRes !== undefined) setTiltRes(d.tiltRes);
+        if (d.winRate !== undefined) setWinRate(d.winRate);
+        if (d.clutchRate !== undefined) setClutchRate(d.clutchRate);
+        if (d.hoursPlayed !== undefined) setHoursPlayed(d.hoursPlayed);
+        if (d.avatarUrl !== undefined) setAvatarUrl(d.avatarUrl);
+        if (d.classRole !== undefined) setClassRole(d.classRole);
+        if (d.mainGame !== undefined) setMainGame(d.mainGame);
+        if (d.selectedPerks !== undefined) setSelectedPerks(d.selectedPerks);
+        if (d.discord !== undefined) setDiscord(d.discord);
+        if (d.psn !== undefined) setPsn(d.psn);
+        if (d.xbox !== undefined) setXbox(d.xbox);
+        if (d.steam !== undefined) setSteam(d.steam);
+        if (d.twitch !== undefined) setTwitch(d.twitch);
+      }
     } catch (e) {
       console.error(e);
+    } finally {
+      setIsDraftLoaded(true);
     }
   }, []);
 
-  // Compute Power Level & Rank Tier
+  // Auto-Save Draft
+  useEffect(() => {
+    if (!isDraftLoaded) return;
+    const draft = {
+      username, vanitySlug, bio, gpu, hz, dpi,
+      apm, luck, salt, tiltRes, winRate, clutchRate, hoursPlayed,
+      avatarUrl, classRole, mainGame, selectedPerks,
+      discord, psn, xbox, steam, twitch
+    };
+    localStorage.setItem("gg_card_draft", JSON.stringify(draft));
+  }, [isDraftLoaded, username, vanitySlug, bio, gpu, hz, dpi, apm, luck, salt, tiltRes, winRate, clutchRate, hoursPlayed, avatarUrl, classRole, mainGame, selectedPerks, discord, psn, xbox, steam, twitch]);
+
   const { powerLevel, rankTier, isHolo } = useMemo(() => {
     const hoursBonus = Math.min(Math.floor(Math.sqrt(hoursPlayed) * 2), 60);
-    const score = Math.round((apm * 1.3) + (winRate * 1.6) + (clutchRate * 1.1) + (tiltRes * 0.4) + hoursBonus);
+    const perkBonus = selectedPerks.length * 10;
+    const score = Math.round((apm * 1.3) + (winRate * 1.6) + (clutchRate * 1.1) + (tiltRes * 0.4) + hoursBonus + perkBonus);
     
     let tier = "BRONZE NOOB";
     if (score >= 400) tier = "🔥 APEX PREDATOR (S-TIER)";
@@ -148,9 +232,8 @@ export default function Home() {
     else if (score >= 140) tier = "🥈 SILVER GRINDER";
 
     return { powerLevel: score, rankTier: tier, isHolo: score >= 400 };
-  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed]);
+  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed, selectedPerks]);
 
-  // Trigger Power-up SFX when unlocking Apex S-Tier
   useEffect(() => {
     if (isHolo && !prevHoloRef.current) {
       sound.playPowerUp();
@@ -165,7 +248,24 @@ export default function Home() {
     if (!nextState) sound.playConfirm();
   };
 
-  // Dynamic Theme Logic
+  const togglePerk = (perkId: string) => {
+    sound.playTick(70);
+    if (selectedPerks.includes(perkId)) {
+      setSelectedPerks(selectedPerks.filter((p) => p !== perkId));
+    } else {
+      if (selectedPerks.length >= 2) {
+        setSelectedPerks([selectedPerks[1], perkId]);
+      } else {
+        setSelectedPerks([...selectedPerks, perkId]);
+      }
+    }
+  };
+
+  const handleFlip = () => {
+    setIsFlipped(!isFlipped);
+    sound.playTick(85);
+  };
+
   let themeName = "default";
   let theme = {
     bg: "#050505",
@@ -204,7 +304,6 @@ export default function Home() {
     };
   }
 
-  // 3D Parallax Mouse & Touch Handlers
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardWrapperRef.current) return;
     setIsHovered(true);
@@ -229,11 +328,6 @@ export default function Home() {
     setIsHovered(false);
     setTilt({ x: 0, y: 0 });
     setGlare({ x: 50, y: 50, opacity: 0 });
-  };
-
-  const handleCardClick = () => {
-    setIsHovered((prev) => !prev);
-    sound.playTick(75);
   };
 
   const fetchLeaderboard = async () => {
@@ -274,6 +368,10 @@ export default function Home() {
     const newCard: GamerCard = {
       username: username || "ANONYMOUS",
       slug: cleanSlug || undefined,
+      bio,
+      hardware_gpu: gpu,
+      hardware_hz: hz,
+      hardware_dpi: dpi,
       apm,
       luck,
       salt,
@@ -287,6 +385,8 @@ export default function Home() {
       theme: themeName,
       avatar_url: avatarUrl,
       class_role: classRole,
+      main_game: mainGame,
+      perks: selectedPerks,
       discord_handle: discord || undefined,
       psn_handle: psn || undefined,
       xbox_handle: xbox || undefined,
@@ -310,11 +410,14 @@ export default function Home() {
     setIsSaving(false);
   };
 
-  // Add Card to Local Collection Binder
   const handleAddToCollection = (cardToCollect?: GamerCard) => {
     const target: GamerCard = cardToCollect || {
       username: username || "ANONYMOUS",
       slug: vanitySlug || undefined,
+      bio,
+      hardware_gpu: gpu,
+      hardware_hz: hz,
+      hardware_dpi: dpi,
       apm,
       luck,
       salt,
@@ -328,11 +431,18 @@ export default function Home() {
       theme: themeName,
       avatar_url: avatarUrl,
       class_role: classRole,
+      main_game: mainGame,
+      perks: selectedPerks,
     };
 
     const updated = [target, ...collection.filter((c) => c.username !== target.username)];
     setCollection(updated);
     localStorage.setItem("gg_card_collection", JSON.stringify(updated));
+    sound.playPowerUp();
+  };
+
+  const startDuel = (opponent: GamerCard) => {
+    setDuelOpponent(opponent);
     sound.playPowerUp();
   };
 
@@ -367,9 +477,30 @@ export default function Home() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const activeRoleObj = CLASS_ROLES.find((r) => r.id === classRole) || CLASS_ROLES[0];
+  const currentCardSlug = vanitySlug.trim() ? vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") : (username || "player");
+  const currentCardUrl = typeof window !== "undefined" ? `${window.location.origin}/card/${currentCardSlug}` : "";
 
-  // Dynamic QR Code Color
+  const shareToX = () => {
+    const text = encodeURIComponent(`⚡ Check out my Gamer Card: ${username} [${powerLevel} PWR | ${rankTier}] | Main: ${mainGame}! Can your stats beat mine? #GamerGreetings`);
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(currentCardUrl)}`, "_blank");
+  };
+
+  const shareToReddit = () => {
+    const title = encodeURIComponent(`[Gamer Card] ${username} - ${rankTier} (PWR: ${powerLevel}) - Main: ${mainGame}`);
+    window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(currentCardUrl)}&title=${title}`, "_blank");
+  };
+
+  const copyIframeEmbed = () => {
+    const embedCode = `<iframe src="${currentCardUrl}" width="340" height="560" frameborder="0" allowtransparency="true"></iframe>`;
+    navigator.clipboard.writeText(embedCode);
+    sound.playConfirm();
+    setCopiedEmbed(true);
+    setTimeout(() => setCopiedEmbed(false), 2000);
+  };
+
+  const activeRoleObj = CLASS_ROLES.find((r) => r.id === classRole) || CLASS_ROLES[0];
+  const activePerksList = AVAILABLE_PERKS.filter((p) => selectedPerks.includes(p.id));
+
   const qrHex = theme.accent.replace("#", "");
   const liveTargetSlug = vanitySlug.trim() ? vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") : (username || "player");
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://gamergreetings.vercel.app/card/${liveTargetSlug}&color=${qrHex}&bgcolor=0a0a10`;
@@ -520,35 +651,191 @@ export default function Home() {
               {collection.map((c, i) => (
                 <div
                   key={i}
-                  onClick={() => {
-                    setUsername(c.username);
-                    setApm(c.apm);
-                    setLuck(c.luck);
-                    setSalt(c.salt);
-                    if (c.tilt_res) setTiltRes(c.tilt_res);
-                    if (c.win_rate) setWinRate(c.win_rate);
-                    if (c.clutch_rate) setClutchRate(c.clutch_rate);
-                    if (c.avatar_url) setAvatarUrl(c.avatar_url);
-                    if (c.class_role) setClassRole(c.class_role);
-                    sound.playPowerUp();
-                  }}
                   style={{
                     backgroundColor: "#161622",
                     border: "1px solid #28283c",
                     borderRadius: "10px",
                     padding: "10px",
-                    minWidth: "140px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
+                    minWidth: "160px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
                   }}
                 >
-                  <div style={{ fontSize: "11px", fontWeight: "bold", color: "#fff" }}>{c.username}</div>
-                  <div style={{ fontSize: "9px", color: "#06b6d4", marginTop: "2px" }}>⚡ PWR {c.power_level ?? 100}</div>
-                  <div style={{ fontSize: "8px", color: "#888", marginTop: "2px" }}>{c.class_role ?? "DPS"}</div>
+                  <div
+                    onClick={() => {
+                      setUsername(c.username);
+                      if (c.bio) setBio(c.bio);
+                      if (c.hardware_gpu) setGpu(c.hardware_gpu);
+                      if (c.hardware_hz) setHz(c.hardware_hz);
+                      if (c.hardware_dpi) setDpi(c.hardware_dpi);
+                      setApm(c.apm);
+                      setLuck(c.luck);
+                      setSalt(c.salt);
+                      if (c.tilt_res) setTiltRes(c.tilt_res);
+                      if (c.win_rate) setWinRate(c.win_rate);
+                      if (c.clutch_rate) setClutchRate(c.clutch_rate);
+                      if (c.avatar_url) setAvatarUrl(c.avatar_url);
+                      if (c.class_role) setClassRole(c.class_role);
+                      if (c.main_game) setMainGame(c.main_game);
+                      if (c.perks) setSelectedPerks(c.perks);
+                      sound.playPowerUp();
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div style={{ fontSize: "11px", fontWeight: "bold", color: "#fff" }}>{c.username}</div>
+                    <div style={{ fontSize: "9px", color: "#06b6d4", marginTop: "2px" }}>⚡ PWR {c.power_level ?? 100}</div>
+                    <div style={{ fontSize: "8px", color: "#888", marginTop: "2px" }}>🎮 {c.main_game || "Valorant"}</div>
+                  </div>
+                  <button
+                    onClick={() => startDuel(c)}
+                    style={{
+                      marginTop: "8px",
+                      backgroundColor: "#f43f5e",
+                      color: "#fff",
+                      border: "none",
+                      padding: "4px",
+                      borderRadius: "4px",
+                      fontSize: "9px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ⚔️ DUEL THIS CARD
+                  </button>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ================= STAT CLASH DUEL ARENA MODAL ================= */}
+      {duelOpponent && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(5, 5, 8, 0.88)",
+            backdropFilter: "blur(8px)",
+            zIndex: 100,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#111118",
+              border: "2px solid #f43f5e",
+              boxShadow: "0 0 40px rgba(244, 63, 94, 0.4)",
+              borderRadius: "20px",
+              padding: "28px",
+              maxWidth: "680px",
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center", marginBottom: "16px" }}>
+              <span style={{ fontSize: "12px", color: "#f43f5e", fontWeight: "900", letterSpacing: "2px" }}>
+                ⚔️ HEAD-TO-HEAD STAT CLASH
+              </span>
+              <button
+                onClick={() => setDuelOpponent(null)}
+                style={{ backgroundColor: "#1e1e2c", color: "#fff", border: "none", borderRadius: "50%", width: "28px", height: "28px", cursor: "pointer", fontWeight: "bold" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Fighter Names & Champion Outcome */}
+            <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center", marginBottom: "20px" }}>
+              <div style={{ textAlign: "center", flex: 1 }}>
+                <h3 style={{ fontSize: "18px", margin: 0, color: "#06b6d4", fontWeight: "900" }}>{username}</h3>
+                <span style={{ fontSize: "10px", color: "#888" }}>{rankTier}</span>
+              </div>
+              <div
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "900",
+                  color: "#f43f5e",
+                  backgroundColor: "#200d14",
+                  padding: "6px 14px",
+                  borderRadius: "20px",
+                  border: "1px solid #f43f5e",
+                  letterSpacing: "1px",
+                }}
+              >
+                VS
+              </div>
+              <div style={{ textAlign: "center", flex: 1 }}>
+                <h3 style={{ fontSize: "18px", margin: 0, color: "#c084fc", fontWeight: "900" }}>{duelOpponent.username}</h3>
+                <span style={{ fontSize: "10px", color: "#888" }}>{duelOpponent.rank_tier ?? "CHALLENGER"}</span>
+              </div>
+            </div>
+
+            {/* Overall Champion Banner */}
+            <div
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "8px",
+                textAlign: "center",
+                fontWeight: "900",
+                fontSize: "13px",
+                letterSpacing: "1px",
+                marginBottom: "20px",
+                backgroundColor: powerLevel >= (duelOpponent.power_level ?? 100) ? "rgba(6,182,212,0.15)" : "rgba(192,132,252,0.15)",
+                border: powerLevel >= (duelOpponent.power_level ?? 100) ? "1px solid #06b6d4" : "1px solid #c084fc",
+                color: powerLevel >= (duelOpponent.power_level ?? 100) ? "#06b6d4" : "#c084fc",
+              }}
+            >
+              👑 OVERALL WINNER: {powerLevel >= (duelOpponent.power_level ?? 100) ? username : duelOpponent.username}
+            </div>
+
+            {/* Stat Row Comparison Matrix */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+              {[
+                { name: "POWER LEVEL", p1: powerLevel, p2: duelOpponent.power_level ?? 100, unit: "⚡" },
+                { name: "APM (ACTIONS/MIN)", p1: apm, p2: duelOpponent.apm, unit: "%" },
+                { name: "WIN RATE", p1: winRate, p2: duelOpponent.win_rate ?? 50, unit: "%" },
+                { name: "CLUTCH RATE", p1: clutchRate, p2: duelOpponent.clutch_rate ?? 50, unit: "%" },
+                { name: "TILT RESISTANCE", p1: tiltRes, p2: duelOpponent.tilt_res ?? 50, unit: "%" },
+                { name: "SALT (RAGE LEVEL)", p1: salt, p2: duelOpponent.salt, unit: "%" },
+              ].map((row) => {
+                const p1Wins = row.p1 > row.p2;
+                const p2Wins = row.p2 > row.p1;
+                return (
+                  <div
+                    key={row.name}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      backgroundColor: "#161622",
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      border: "1px solid #222234",
+                    }}
+                  >
+                    <span style={{ fontSize: "12px", fontWeight: "900", color: p1Wins ? "#06b6d4" : "#666", width: "70px" }}>
+                      {row.unit} {row.p1}
+                    </span>
+                    <span style={{ fontSize: "10px", color: "#aaa", letterSpacing: "1px", fontWeight: "bold" }}>
+                      {row.name}
+                    </span>
+                    <span style={{ fontSize: "12px", fontWeight: "900", color: p2Wins ? "#c084fc" : "#666", width: "70px", textAlign: "right" }}>
+                      {row.unit} {row.p2}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -630,6 +917,97 @@ export default function Home() {
                   boxSizing: "border-box",
                 }}
               />
+            </div>
+          </div>
+
+          {/* Player Motto / Bio */}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
+              CARD BACK BIO / MOTTO
+            </label>
+            <input
+              type="text"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="e.g. Clutch or kick."
+              style={{
+                width: "100%",
+                backgroundColor: "#1b1b24",
+                border: "1px solid #282836",
+                borderRadius: "8px",
+                padding: "8px 10px",
+                color: "#fff",
+                fontSize: "12px",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {/* Main Game Selector */}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
+              CURRENT MAIN TITLE
+            </label>
+            <select
+              value={mainGame}
+              onChange={(e) => {
+                setMainGame(e.target.value);
+                sound.playTick(65);
+              }}
+              style={{
+                width: "100%",
+                backgroundColor: "#1b1b24",
+                border: "1px solid #282836",
+                borderRadius: "8px",
+                padding: "10px",
+                color: "#fff",
+                fontWeight: "bold",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            >
+              {POPULAR_GAMES.map((game) => (
+                <option key={game} value={game}>
+                  🎮 {game}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Gamer Perk Chips */}
+          <div style={{ marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+              <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px" }}>
+                PLAYSTYLE PERKS
+              </label>
+              <span style={{ fontSize: "10px", color: theme.accent }}>
+                {selectedPerks.length}/2 ACTIVE
+              </span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {AVAILABLE_PERKS.map((perk) => {
+                const isSelected = selectedPerks.includes(perk.id);
+                return (
+                  <button
+                    key={perk.id}
+                    onClick={() => togglePerk(perk.id)}
+                    style={{
+                      backgroundColor: isSelected ? `${perk.color}22` : "#1b1b24",
+                      border: isSelected ? `1px solid ${perk.color}` : "1px solid #282836",
+                      color: isSelected ? perk.color : "#888",
+                      borderRadius: "6px",
+                      padding: "4px 8px",
+                      fontSize: "10px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {perk.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -723,7 +1101,7 @@ export default function Home() {
                   max="100"
                   value={s.val}
                   onChange={(e) => {
-                    const v = Number(e.target.value);
+                    const v = Math.max(0, Math.min(100, Number(e.target.value)));
                     s.set(v);
                     sound.playTick(v);
                   }}
@@ -740,9 +1118,12 @@ export default function Home() {
             </label>
             <input
               type="number"
+              min="0"
+              max="99999"
               value={hoursPlayed}
               onChange={(e) => {
-                setHoursPlayed(Number(e.target.value));
+                const h = Math.max(0, Math.min(99999, Number(e.target.value)));
+                setHoursPlayed(h);
                 sound.playTick(50);
               }}
               style={{
@@ -758,20 +1139,59 @@ export default function Home() {
             />
           </div>
 
-          {/* QR Code Toggle */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", backgroundColor: "#171720", padding: "8px 12px", borderRadius: "8px" }}>
-            <span style={{ fontSize: "11px", color: "#aaa" }}>SHOW SCANNABLE QR CODE</span>
-            <input
-              type="checkbox"
-              checked={showQrCode}
-              onChange={(e) => {
-                setShowQrCode(e.target.checked);
-                sound.playTick(40);
-              }}
-              style={{ cursor: "pointer", accentColor: theme.accent }}
-            />
-          </div>
+          {/* Hardware Specs */}
+          <button
+            onClick={() => {
+              setShowHardware(!showHardware);
+              sound.playTick(40);
+            }}
+            style={{
+              backgroundColor: "transparent",
+              color: "#888",
+              border: "1px dashed #333",
+              width: "100%",
+              padding: "8px",
+              borderRadius: "8px",
+              fontSize: "11px",
+              letterSpacing: "1px",
+              cursor: "pointer",
+              marginBottom: "8px",
+            }}
+          >
+            {showHardware ? "▲ HIDE HARDWARE SPECS" : "▼ BACKSIDE HARDWARE RIG SPECS"}
+          </button>
 
+          {showHardware && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px", backgroundColor: "#171720", padding: "12px", borderRadius: "8px" }}>
+              {[
+                { label: "GRAPHICS CARD / GPU", val: gpu, set: setGpu, placeholder: "e.g. RTX 3070" },
+                { label: "DISPLAY REFRESH RATE", val: hz, set: setHz, placeholder: "e.g. 240Hz" },
+                { label: "MOUSE SENSITIVITY / DPI", val: dpi, set: setDpi, placeholder: "e.g. 800 DPI" },
+              ].map((hw) => (
+                <div key={hw.label}>
+                  <label style={{ fontSize: "9px", color: "#666", display: "block" }}>{hw.label}</label>
+                  <input
+                    type="text"
+                    value={hw.val}
+                    placeholder={hw.placeholder}
+                    onChange={(e) => hw.set(e.target.value)}
+                    style={{
+                      width: "100%",
+                      backgroundColor: "#111116",
+                      border: "1px solid #282836",
+                      borderRadius: "4px",
+                      padding: "6px",
+                      color: "#fff",
+                      fontSize: "11px",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Gamer Handles */}
           <button
             onClick={() => {
               setShowHandles(!showHandles);
@@ -787,7 +1207,7 @@ export default function Home() {
               fontSize: "11px",
               letterSpacing: "1px",
               cursor: "pointer",
-              margin: "8px 0 12px 0",
+              marginBottom: "12px",
             }}
           >
             {showHandles ? "▲ HIDE GAMER HANDLES" : "▼ CONNECT GAMER HANDLES"}
@@ -808,7 +1228,7 @@ export default function Home() {
                     type="text"
                     value={h.val}
                     placeholder={h.placeholder}
-                    onChange={(e) => h.set(e.target.value)}
+                    onChange={(e) => h.set(sanitizeHandle(e.target.value))}
                     style={{
                       width: "100%",
                       backgroundColor: "#111116",
@@ -825,6 +1245,21 @@ export default function Home() {
             </div>
           )}
 
+          {/* QR Toggle */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", backgroundColor: "#171720", padding: "8px 12px", borderRadius: "8px" }}>
+            <span style={{ fontSize: "11px", color: "#aaa" }}>SHOW SCANNABLE QR CODE</span>
+            <input
+              type="checkbox"
+              checked={showQrCode}
+              onChange={(e) => {
+                setShowQrCode(e.target.checked);
+                sound.playTick(40);
+              }}
+              style={{ cursor: "pointer", accentColor: theme.accent }}
+            />
+          </div>
+
+          {/* Action Buttons */}
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "12px" }}>
             <button
               onClick={handleSaveToLeaderboard}
@@ -882,291 +1317,385 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 3D Perspective Wrapper */}
-        <div
-          ref={cardWrapperRef}
-          onMouseMove={handleMouseMove}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={handleMouseLeave}
-          onClick={handleCardClick}
-          style={{
-            perspective: "1000px",
-            cursor: "grab",
-          }}
-        >
-          {/* 9:16 Full-Bleed Artwork Card with 3D Tilt */}
-          <div
-            ref={cardRef}
+        {/* 3D Card Column */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" }}>
+          <button
+            onClick={handleFlip}
             style={{
-              width: "300px",
-              height: "500px",
-              border: theme.border,
-              boxShadow: theme.glow,
+              backgroundColor: "#161622",
+              border: `1px solid ${theme.accent}`,
+              color: "#fff",
               borderRadius: "20px",
-              position: "relative",
-              overflow: "hidden",
+              padding: "6px 16px",
+              fontSize: "12px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: `0 0 15px ${theme.accent}33`,
               display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              padding: "20px",
-              boxSizing: "border-box",
-              backgroundColor: "#111116",
-              transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(1.02, 1.02, 1.02)`,
-              transition: tilt.x === 0 && tilt.y === 0 ? "all 0.5s ease-out" : "transform 0.1s ease-out",
-              transformStyle: "preserve-3d",
+              alignItems: "center",
+              gap: "6px",
             }}
           >
-            {/* Background Artwork */}
-            {avatarUrl && (
-              <img
-                src={avatarUrl}
-                alt="Card Background"
+            🔄 {isFlipped ? "VIEW CARD FRONT" : "FLIP TO BACK / SPECS"}
+          </button>
+
+          {/* 3D Perspective Wrapper */}
+          <div
+            ref={cardWrapperRef}
+            onMouseMove={handleMouseMove}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={handleMouseLeave}
+            style={{
+              perspective: "1200px",
+              cursor: "grab",
+              width: "300px",
+              height: "500px",
+            }}
+          >
+            {/* Flippable Container */}
+            <div
+              ref={cardRef}
+              style={{
+                width: "100%",
+                height: "100%",
+                position: "relative",
+                transformStyle: "preserve-3d",
+                transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y + (isFlipped ? 180 : 0)}deg) scale3d(1.02, 1.02, 1.02)`,
+                transition: "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
+            >
+              {/* ================= FRONT FACE ================= */}
+              <div
                 style={{
                   position: "absolute",
-                  top: 0,
-                  left: 0,
+                  inset: 0,
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover",
-                  zIndex: 0,
+                  backfaceVisibility: "hidden",
+                  WebkitBackfaceVisibility: "hidden",
+                  border: theme.border,
+                  boxShadow: theme.glow,
+                  borderRadius: "20px",
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  padding: "20px",
+                  boxSizing: "border-box",
+                  backgroundColor: "#111116",
                 }}
-              />
-            )}
+              >
+                {avatarUrl && (
+                  <img
+                    src={avatarUrl}
+                    alt="Card Background"
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }}
+                  />
+                )}
 
-            {/* Dark Glass Overlay */}
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "linear-gradient(180deg, rgba(8,8,12,0.65) 0%, rgba(8,8,12,0.4) 35%, rgba(8,8,12,0.92) 80%, rgba(8,8,12,0.98) 100%)",
-                backdropFilter: "blur(2px)",
-                zIndex: 1,
-              }}
-            />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(180deg, rgba(8,8,12,0.65) 0%, rgba(8,8,12,0.4) 35%, rgba(8,8,12,0.92) 80%, rgba(8,8,12,0.98) 100%)",
+                    backdropFilter: "blur(2px)",
+                    zIndex: 1,
+                  }}
+                />
 
-            {/* Dense Floating Cyber Particles */}
-            <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 2 }}>
-              <div style={{ position: "absolute", bottom: "-10px", left: "15%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#06b6d4", boxShadow: "0 0 8px #06b6d4", animation: "floatUp1 3.2s infinite linear" }} />
-              <div style={{ position: "absolute", bottom: "-10px", left: "40%", width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#c084fc", boxShadow: "0 0 10px #c084fc", animation: "floatUp2 4.0s infinite linear 0.6s" }} />
-              <div style={{ position: "absolute", bottom: "-10px", left: "70%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#f43f5e", boxShadow: "0 0 8px #f43f5e", animation: "floatUp3 3.0s infinite linear 1.2s" }} />
-              <div style={{ position: "absolute", bottom: "-10px", left: "88%", width: "3px", height: "3px", borderRadius: "50%", backgroundColor: "#22c55e", boxShadow: "0 0 6px #22c55e", animation: "floatUp4 3.6s infinite linear 0.4s" }} />
-              <div style={{ position: "absolute", bottom: "-10px", left: "28%", width: "3px", height: "3px", borderRadius: "50%", backgroundColor: "#eab308", boxShadow: "0 0 6px #eab308", animation: "floatUp3 4.2s infinite linear 1.8s" }} />
-              <div style={{ position: "absolute", bottom: "-10px", left: "52%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#ec4899", boxShadow: "0 0 8px #ec4899", animation: "floatUp1 3.5s infinite linear 2.2s" }} />
-              <div style={{ position: "absolute", bottom: "-10px", left: "6%", width: "2px", height: "2px", borderRadius: "50%", backgroundColor: "#06b6d4", boxShadow: "0 0 4px #06b6d4", animation: "floatUp2 2.8s infinite linear 1.5s" }} />
-              <div style={{ position: "absolute", bottom: "-10px", left: "82%", width: "3px", height: "3px", borderRadius: "50%", backgroundColor: "#ffffff", boxShadow: "0 0 8px #ffffff", animation: "floatUp4 3.1s infinite linear 0.9s" }} />
-            </div>
+                {/* Cyber Particles */}
+                <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 2 }}>
+                  <div style={{ position: "absolute", bottom: "-10px", left: "15%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#06b6d4", boxShadow: "0 0 8px #06b6d4", animation: "floatUp1 3.2s infinite linear" }} />
+                  <div style={{ position: "absolute", bottom: "-10px", left: "40%", width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#c084fc", boxShadow: "0 0 10px #c084fc", animation: "floatUp2 4.0s infinite linear 0.6s" }} />
+                  <div style={{ position: "absolute", bottom: "-10px", left: "70%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#f43f5e", boxShadow: "0 0 8px #f43f5e", animation: "floatUp3 3.0s infinite linear 1.2s" }} />
+                  <div style={{ position: "absolute", bottom: "-10px", left: "88%", width: "3px", height: "3px", borderRadius: "50%", backgroundColor: "#22c55e", boxShadow: "0 0 6px #22c55e", animation: "floatUp4 3.6s infinite linear 0.4s" }} />
+                </div>
 
-            {/* Continuous Holographic Rainbow Foil Shimmer on Hover / Touch */}
-            {isHovered && (
+                {isHovered && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "-60%",
+                      left: "-60%",
+                      width: "220%",
+                      height: "220%",
+                      background: "linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.25) 42%, rgba(244,63,94,0.55) 47%, rgba(6,182,212,0.55) 50%, rgba(192,132,252,0.55) 53%, rgba(234,179,8,0.45) 57%, transparent 75%)",
+                      pointerEvents: "none",
+                      zIndex: 3,
+                      animation: "holoSheenContinuous 1.8s infinite linear",
+                    }}
+                  />
+                )}
+
+                {/* Glare Reflection */}
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255,255,255,${glare.opacity}) 0%, rgba(255,255,255,0) 65%)`,
+                    mixBlendMode: "overlay",
+                    pointerEvents: "none",
+                    zIndex: 4,
+                  }}
+                />
+
+                {/* Front Top Row */}
+                <div style={{ position: "relative", zIndex: 5, display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
+                  <div>
+                    <span style={{ fontSize: "9px", color: "#ddd", letterSpacing: "1.5px", textShadow: "0 1px 4px #000" }}>
+                      🎮 {mainGame.toUpperCase()}
+                    </span>
+                    <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0, letterSpacing: "1px", wordBreak: "break-word", textShadow: "0 2px 8px #000" }}>
+                      {username || "ANONYMOUS"}
+                    </h2>
+                  </div>
+
+                  {theme.badge && (
+                    <div style={{ backgroundColor: "rgba(0,0,0,0.6)", border: `1px solid ${theme.accent}`, padding: "3px 6px", borderRadius: "6px", fontSize: "9px", fontWeight: "bold", color: theme.accent, backdropFilter: "blur(6px)" }}>
+                      {theme.badge}
+                    </div>
+                  )}
+                </div>
+
+                {/* Front Middle Stats */}
+                <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", gap: "8px", marginTop: "auto", marginBottom: "8px" }}>
+                  <div style={{ backgroundColor: isHolo ? "rgba(244,63,94,0.3)" : "rgba(0,0,0,0.6)", border: isHolo ? "1px solid rgba(244,63,94,0.7)" : "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(8px)" }}>
+                    <div>
+                      <span style={{ fontSize: "8px", color: "#ccc", letterSpacing: "1px", display: "block" }}>POWER LEVEL</span>
+                      <span style={{ fontSize: "16px", fontWeight: "900", color: isHolo ? "#f43f5e" : "#06b6d4" }}>
+                        ⚡ {powerLevel}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: "8px", color: "#aaa", display: "block" }}>RANK TIER</span>
+                      <span style={{ fontSize: "9px", fontWeight: "bold", color: "#fff" }}>{rankTier}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ backgroundColor: "rgba(0,0,0,0.65)", border: `1px solid ${activeRoleObj.color}`, color: activeRoleObj.color, padding: "3px 6px", borderRadius: "6px", fontSize: "9px", fontWeight: "bold", letterSpacing: "1px", backdropFilter: "blur(6px)" }}>
+                      {activeRoleObj.label}
+                    </div>
+                    <span style={{ fontSize: "9px", color: "#fff", fontFamily: "monospace", textShadow: "0 1px 4px #000" }}>
+                      ⏳ {hoursPlayed.toLocaleString()} hrs
+                    </span>
+                  </div>
+
+                  {activePerksList.length > 0 && (
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                      {activePerksList.map((p) => (
+                        <div key={p.id} style={{ fontSize: "8px", fontWeight: "bold", color: p.color, backgroundColor: "rgba(0,0,0,0.6)", border: `1px solid ${p.color}88`, borderRadius: "4px", padding: "2px 6px", backdropFilter: "blur(4px)" }}>
+                          {p.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: "6px", alignItems: "stretch" }}>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", padding: "4px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", backdropFilter: "blur(6px)" }}>
+                        <span style={{ fontSize: "7px", color: "#aaa", display: "block" }}>WIN RATE</span>
+                        <span style={{ fontSize: "11px", fontWeight: "bold", color: "#22c55e" }}>{winRate}%</span>
+                      </div>
+                      <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", padding: "4px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", backdropFilter: "blur(6px)" }}>
+                        <span style={{ fontSize: "7px", color: "#aaa", display: "block" }}>CLUTCH</span>
+                        <span style={{ fontSize: "11px", fontWeight: "bold", color: "#eab308" }}>{clutchRate}%</span>
+                      </div>
+                    </div>
+
+                    {showQrCode && (
+                      <div style={{ width: "60px", backgroundColor: "rgba(10, 10, 16, 0.85)", border: `1px solid ${theme.accent}`, boxShadow: `0 0 10px ${theme.accent}44`, borderRadius: "6px", padding: "4px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}>
+                        <img src={qrCodeUrl} alt="Gamer QR" style={{ width: "42px", height: "42px", borderRadius: "3px" }} />
+                        <span style={{ fontSize: "6px", color: theme.accent, marginTop: "2px", fontWeight: "bold", letterSpacing: "0.5px" }}>SCAN</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Front Bars */}
+                <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", gap: "5px" }}>
+                  {[
+                    { name: `APM • ${getStatTitle("apm", apm)}`, val: apm, col: "#06b6d4" },
+                    { name: `LUCK • ${getStatTitle("luck", luck)}`, val: luck, col: "#c084fc" },
+                    { name: `SALT • ${getStatTitle("salt", salt)}`, val: salt, col: "#ef4444" },
+                    { name: `TILT RES • ${getStatTitle("tiltRes", tiltRes)}`, val: tiltRes, col: "#38bdf8" },
+                  ].map((bar) => (
+                    <div key={bar.name}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "7.5px", color: "#ccc", marginBottom: "2px", textShadow: "0 1px 2px #000" }}>
+                        <span>{bar.name}</span>
+                        <span>{bar.val}%</span>
+                      </div>
+                      <div style={{ width: "100%", height: "4px", backgroundColor: "rgba(0,0,0,0.6)", borderRadius: "2px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div style={{ width: `${bar.val}%`, height: "100%", backgroundColor: bar.col }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ================= BACK FACE ================= */}
               <div
                 style={{
                   position: "absolute",
-                  top: "-60%",
-                  left: "-60%",
-                  width: "220%",
-                  height: "220%",
-                  background: "linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.25) 42%, rgba(244,63,94,0.55) 47%, rgba(6,182,212,0.55) 50%, rgba(192,132,252,0.55) 53%, rgba(234,179,8,0.45) 57%, transparent 75%)",
-                  pointerEvents: "none",
-                  zIndex: 3,
-                  animation: "holoSheenContinuous 1.8s infinite linear",
-                }}
-              />
-            )}
-
-            {/* Dynamic Parallax Glare Highlight */}
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255,255,255,${glare.opacity}) 0%, rgba(255,255,255,0) 65%)`,
-                mixBlendMode: "overlay",
-                pointerEvents: "none",
-                zIndex: 4,
-                transition: "opacity 0.2s ease",
-              }}
-            />
-
-            {/* Top Row: Username & Badge */}
-            <div style={{ position: "relative", zIndex: 5, display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
-              <div>
-                <span style={{ fontSize: "9px", color: "#ddd", letterSpacing: "1.5px", textShadow: "0 1px 4px #000" }}>
-                  // GAMER_CARD
-                </span>
-                <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0, letterSpacing: "1px", wordBreak: "break-word", textShadow: "0 2px 8px #000" }}>
-                  {username || "ANONYMOUS"}
-                </h2>
-              </div>
-
-              {theme.badge && (
-                <div
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.6)",
-                    border: `1px solid ${theme.accent}`,
-                    padding: "3px 6px",
-                    borderRadius: "6px",
-                    fontSize: "9px",
-                    fontWeight: "bold",
-                    color: theme.accent,
-                    backdropFilter: "blur(6px)",
-                  }}
-                >
-                  {theme.badge}
-                </div>
-              )}
-            </div>
-
-            {/* Middle Content */}
-            <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", gap: "8px", marginTop: "auto", marginBottom: "8px" }}>
-              <div
-                style={{
-                  backgroundColor: isHolo ? "rgba(244,63,94,0.3)" : "rgba(0,0,0,0.6)",
-                  border: isHolo ? "1px solid rgba(244,63,94,0.7)" : "1px solid rgba(255,255,255,0.15)",
-                  borderRadius: "8px",
-                  padding: "6px 10px",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  backfaceVisibility: "hidden",
+                  WebkitBackfaceVisibility: "hidden",
+                  transform: "rotateY(180deg)",
+                  border: theme.border,
+                  boxShadow: theme.glow,
+                  borderRadius: "20px",
+                  overflow: "hidden",
                   display: "flex",
+                  flexDirection: "column",
                   justifyContent: "space-between",
-                  alignItems: "center",
-                  backdropFilter: "blur(8px)",
+                  padding: "20px",
+                  boxSizing: "border-box",
+                  backgroundColor: "#0d0d14",
+                  backgroundImage: "radial-gradient(#1c1c2b 1px, transparent 1px)",
+                  backgroundSize: "16px 16px",
                 }}
               >
-                <div>
-                  <span style={{ fontSize: "8px", color: "#ccc", letterSpacing: "1px", display: "block" }}>POWER LEVEL</span>
-                  <span style={{ fontSize: "16px", fontWeight: "900", color: isHolo ? "#f43f5e" : "#06b6d4" }}>
-                    ⚡ {powerLevel}
-                  </span>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: "8px", color: "#aaa", display: "block" }}>RANK TIER</span>
-                  <span style={{ fontSize: "9px", fontWeight: "bold", color: "#fff" }}>{rankTier}</span>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.65)",
-                    border: `1px solid ${activeRoleObj.color}`,
-                    color: activeRoleObj.color,
-                    padding: "3px 6px",
-                    borderRadius: "6px",
-                    fontSize: "9px",
-                    fontWeight: "bold",
-                    letterSpacing: "1px",
-                    backdropFilter: "blur(6px)",
-                  }}
-                >
-                  {activeRoleObj.label}
-                </div>
-                <span style={{ fontSize: "9px", color: "#fff", fontFamily: "monospace", textShadow: "0 1px 4px #000" }}>
-                  ⏳ {hoursPlayed.toLocaleString()} hrs
-                </span>
-              </div>
-
-              {/* Quick Metrics Badges & QR Code */}
-              <div style={{ display: "flex", gap: "6px", alignItems: "stretch" }}>
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", padding: "4px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", backdropFilter: "blur(6px)" }}>
-                    <span style={{ fontSize: "7px", color: "#aaa", display: "block" }}>WIN RATE</span>
-                    <span style={{ fontSize: "11px", fontWeight: "bold", color: "#22c55e" }}>{winRate}%</span>
-                  </div>
-                  <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", padding: "4px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", backdropFilter: "blur(6px)" }}>
-                    <span style={{ fontSize: "7px", color: "#aaa", display: "block" }}>CLUTCH</span>
-                    <span style={{ fontSize: "11px", fontWeight: "bold", color: "#eab308" }}>{clutchRate}%</span>
-                  </div>
-                </div>
-
-                {showQrCode && (
-                  <div
-                    style={{
-                      width: "60px",
-                      backgroundColor: "rgba(10, 10, 16, 0.85)",
-                      border: `1px solid ${theme.accent}`,
-                      boxShadow: `0 0 10px ${theme.accent}44`,
-                      borderRadius: "6px",
-                      padding: "4px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backdropFilter: "blur(6px)",
-                      transition: "all 0.3s ease",
-                    }}
-                  >
-                    <img
-                      src={qrCodeUrl}
-                      alt="Gamer QR"
-                      style={{ width: "42px", height: "42px", borderRadius: "3px" }}
-                    />
-                    <span style={{ fontSize: "6px", color: theme.accent, marginTop: "2px", fontWeight: "bold", letterSpacing: "0.5px" }}>
-                      SCAN
+                <div style={{ borderBottom: "1px solid #28283c", paddingBottom: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "9px", color: theme.accent, letterSpacing: "2px", fontWeight: "bold" }}>
+                      // DOSSIER & RIG SPECS
+                    </span>
+                    <span style={{ fontSize: "8px", color: "#666", fontFamily: "monospace" }}>
+                      SN: #{powerLevel}94
                     </span>
                   </div>
-                )}
-              </div>
+                  <h3 style={{ fontSize: "16px", fontWeight: "900", margin: "4px 0 0 0", color: "#fff" }}>
+                    {username || "ANONYMOUS"}
+                  </h3>
+                </div>
 
-              {/* Connected Handles Section */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                {[
-                  { icon: "👾", name: "Discord", val: discord },
-                  { icon: "🎮", name: "PSN", val: psn },
-                  { icon: "🟢", name: "Xbox", val: xbox },
-                  { icon: "⚙️", name: "Steam", val: steam },
-                  { icon: "💜", name: "Twitch", val: twitch },
-                ]
-                  .filter((h) => h.val)
-                  .map((h) => (
-                    <div
-                      key={h.name}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        backgroundColor: "rgba(0,0,0,0.6)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        fontSize: "8px",
-                        backdropFilter: "blur(6px)",
-                      }}
-                    >
-                      <span>{h.icon}</span>
-                      <span style={{ color: "#bbb" }}>{h.name}:</span>
-                      <span style={{ color: "#fff", fontWeight: "bold" }}>{h.val}</span>
+                <div style={{ backgroundColor: "#14141e", border: "1px solid #242436", borderRadius: "8px", padding: "10px" }}>
+                  <span style={{ fontSize: "8px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "4px" }}>
+                    PLAYER MOTTO / LORE
+                  </span>
+                  <p style={{ fontSize: "11px", color: "#ddd", margin: 0, fontStyle: "italic", lineHeight: "1.4" }}>
+                    &ldquo;{bio || "Clutch or kick."}&rdquo;
+                  </p>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <span style={{ fontSize: "8px", color: "#888", letterSpacing: "1px" }}>
+                    BATTLESTATION HARDWARE
+                  </span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                    <div style={{ backgroundColor: "#14141e", border: "1px solid #242436", borderRadius: "6px", padding: "6px" }}>
+                      <span style={{ fontSize: "7px", color: "#666", display: "block" }}>GPU</span>
+                      <span style={{ fontSize: "10px", fontWeight: "bold", color: "#06b6d4" }}>{gpu || "RTX 3070"}</span>
                     </div>
-                  ))}
-              </div>
-            </div>
-
-            {/* Core Bar Displays with Dynamic Trait Titles */}
-            <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", gap: "5px" }}>
-              {[
-                { name: `APM • ${getStatTitle("apm", apm)}`, val: apm, col: "#06b6d4" },
-                { name: `LUCK • ${getStatTitle("luck", luck)}`, val: luck, col: "#c084fc" },
-                { name: `SALT • ${getStatTitle("salt", salt)}`, val: salt, col: "#ef4444" },
-                { name: `TILT RES • ${getStatTitle("tiltRes", tiltRes)}`, val: tiltRes, col: "#38bdf8" },
-              ].map((bar) => (
-                <div key={bar.name}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "7.5px", color: "#ccc", marginBottom: "2px", textShadow: "0 1px 2px #000" }}>
-                    <span>{bar.name}</span>
-                    <span>{bar.val}%</span>
+                    <div style={{ backgroundColor: "#14141e", border: "1px solid #242436", borderRadius: "6px", padding: "6px" }}>
+                      <span style={{ fontSize: "7px", color: "#666", display: "block" }}>REFRESH</span>
+                      <span style={{ fontSize: "10px", fontWeight: "bold", color: "#c084fc" }}>{hz || "240Hz"}</span>
+                    </div>
                   </div>
-                  <div style={{ width: "100%", height: "4px", backgroundColor: "rgba(0,0,0,0.6)", borderRadius: "2px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div style={{ width: `${bar.val}%`, height: "100%", backgroundColor: bar.col }} />
+                  <div style={{ backgroundColor: "#14141e", border: "1px solid #242436", borderRadius: "6px", padding: "6px" }}>
+                    <span style={{ fontSize: "7px", color: "#666", display: "block" }}>SENSITIVITY</span>
+                    <span style={{ fontSize: "10px", fontWeight: "bold", color: "#22c55e" }}>{dpi || "800 DPI"}</span>
                   </div>
                 </div>
-              ))}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                  {[
+                    { icon: "👾", name: "Discord", val: discord },
+                    { icon: "🎮", name: "PSN", val: psn },
+                    { icon: "🟢", name: "Xbox", val: xbox },
+                    { icon: "⚙️", name: "Steam", val: steam },
+                    { icon: "💜", name: "Twitch", val: twitch },
+                  ]
+                    .filter((h) => h.val)
+                    .map((h) => (
+                      <div key={h.name} style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#14141e", border: "1px solid #242436", padding: "3px 6px", borderRadius: "4px", fontSize: "8px" }}>
+                        <span>{h.icon}</span>
+                        <span style={{ color: "#888" }}>{h.name}:</span>
+                        <span style={{ color: "#fff", fontWeight: "bold" }}>{h.val}</span>
+                      </div>
+                    ))}
+                </div>
+
+                <div style={{ borderTop: "1px solid #28283c", paddingTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "7px", color: "#666", letterSpacing: "1px" }}>
+                    OFFICIAL GG CYBER RECORD
+                  </span>
+                  <div style={{ width: "24px", height: "14px", borderRadius: "3px", background: "linear-gradient(45deg, #f43f5e, #06b6d4, #eab308)", opacity: 0.8 }} />
+                </div>
+              </div>
             </div>
+          </div>
+
+          {/* Quick Viral Share Bar */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              backgroundColor: "#111116",
+              border: "1px solid #22222e",
+              borderRadius: "12px",
+              padding: "8px 12px",
+            }}
+          >
+            <span style={{ fontSize: "10px", color: "#888", fontWeight: "bold", letterSpacing: "1px" }}>SHARE:</span>
+            <button
+              onClick={shareToX}
+              title="Share to X / Twitter"
+              style={{
+                backgroundColor: "#1b1b24",
+                border: "1px solid #333348",
+                color: "#fff",
+                borderRadius: "6px",
+                padding: "4px 8px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              𝕏 Post
+            </button>
+
+            <button
+              onClick={shareToReddit}
+              title="Share to Reddit"
+              style={{
+                backgroundColor: "#1b1b24",
+                border: "1px solid #333348",
+                color: "#ff4500",
+                borderRadius: "6px",
+                padding: "4px 8px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              Reddit
+            </button>
+
+            <button
+              onClick={copyIframeEmbed}
+              title="Copy OBS / Twitch Overlay iframe embed code"
+              style={{
+                backgroundColor: "#1b1b24",
+                border: `1px solid ${copiedEmbed ? "#22c55e" : "#333348"}`,
+                color: copiedEmbed ? "#22c55e" : "#06b6d4",
+                borderRadius: "6px",
+                padding: "4px 8px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              {copiedEmbed ? "EMBED COPIED!" : "</> OBS Embed"}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Global Leaderboard */}
+      {/* Global Leaderboard with Duel Buttons */}
       <div
         style={{
           marginTop: "48px",
@@ -1291,6 +1820,11 @@ export default function Home() {
                             {card.class_role}
                           </span>
                         )}
+                        {card.main_game && (
+                          <span style={{ fontSize: "9px", backgroundColor: "rgba(6,182,212,0.15)", color: "#06b6d4", padding: "2px 6px", borderRadius: "4px" }}>
+                            🎮 {card.main_game}
+                          </span>
+                        )}
                       </div>
                       <span style={{ fontSize: "11px", color: theme.accent, fontWeight: "bold", fontFamily: "monospace" }}>
                         {statHighlight}
@@ -1300,6 +1834,22 @@ export default function Home() {
 
                   {identifier && (
                     <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => startDuel(card)}
+                        title="Challenge this card to a head-to-head stat clash!"
+                        style={{
+                          fontSize: "10px",
+                          backgroundColor: "#f43f5e",
+                          color: "#fff",
+                          border: "none",
+                          padding: "4px 8px",
+                          borderRadius: "4px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        ⚔️ VS
+                      </button>
                       <button
                         onClick={() => handleAddToCollection(card)}
                         title="Collect this card to your binder"
