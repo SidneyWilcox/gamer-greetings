@@ -215,20 +215,66 @@ export default function Home() {
   useEffect(() => {
     if (!isDraftLoaded) return;
     const draft = {
-      username, vanitySlug, bio, gpu, hz, dpi,
-      apm, luck, salt, tiltRes, winRate, clutchRate, hoursPlayed,
-      avatarUrl, classRole, mainGame, selectedPerks, proSkin,
-      discord, psn, xbox, steam, twitch
+      username,
+      vanitySlug,
+      bio,
+      gpu,
+      hz,
+      dpi,
+      apm,
+      luck,
+      salt,
+      tiltRes,
+      winRate,
+      clutchRate,
+      hoursPlayed,
+      avatarUrl,
+      classRole,
+      mainGame,
+      selectedPerks,
+      proSkin,
+      discord,
+      psn,
+      xbox,
+      steam,
+      twitch,
     };
     localStorage.setItem("gg_card_draft", JSON.stringify(draft));
-  }, [isDraftLoaded, username, vanitySlug, bio, gpu, hz, dpi, apm, luck, salt, tiltRes, winRate, clutchRate, hoursPlayed, avatarUrl, classRole, mainGame, selectedPerks, proSkin, discord, psn, xbox, steam, twitch]);
+  }, [
+    isDraftLoaded,
+    username,
+    vanitySlug,
+    bio,
+    gpu,
+    hz,
+    dpi,
+    apm,
+    luck,
+    salt,
+    tiltRes,
+    winRate,
+    clutchRate,
+    hoursPlayed,
+    avatarUrl,
+    classRole,
+    mainGame,
+    selectedPerks,
+    proSkin,
+    discord,
+    psn,
+    xbox,
+    steam,
+    twitch,
+  ]);
 
   const { powerLevel, rankTier, isHolo } = useMemo(() => {
     const hoursBonus = Math.min(Math.floor(Math.sqrt(hoursPlayed) * 2), 60);
     const perkBonus = selectedPerks.length * 10;
     const proSkinBonus = proSkin !== "standard" ? 15 : 0;
-    const score = Math.round((apm * 1.3) + (winRate * 1.6) + (clutchRate * 1.1) + (tiltRes * 0.4) + hoursBonus + perkBonus + proSkinBonus);
-    
+    const score = Math.round(
+      apm * 1.3 + winRate * 1.6 + clutchRate * 1.1 + tiltRes * 0.4 + hoursBonus + perkBonus + proSkinBonus
+    );
+
     let tier = "BRONZE NOOB";
     if (score >= 400) tier = "🔥 APEX PREDATOR (S-TIER)";
     else if (score >= 300) tier = "💎 DIAMOND ELITE";
@@ -272,7 +318,7 @@ export default function Home() {
 
   let themeName = "default";
   let theme = {
-    bg: "#050505",
+    bg: "#08070e",
     border: isHolo ? "2px solid #f43f5e" : "1px solid rgba(6, 182, 212, 0.5)",
     glow: isHolo ? "0 0 35px rgba(244, 63, 94, 0.45)" : "0 0 25px rgba(6, 182, 212, 0.25)",
     accent: isHolo ? "#f43f5e" : "#06b6d4",
@@ -365,9 +411,7 @@ export default function Home() {
       query = query.eq("class_role", roleFilter);
     }
 
-    const { data, error } = await query
-      .order(activeCategory, { ascending: false })
-      .limit(10);
+    const { data, error } = await query.order(activeCategory, { ascending: false }).limit(10);
 
     if (error) console.error("Error fetching leaderboard:", error);
     else if (data) setLeaderboard(data);
@@ -507,16 +551,22 @@ export default function Home() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const currentCardSlug = vanitySlug.trim() ? vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") : (username || "player");
+  const currentCardSlug = vanitySlug.trim()
+    ? vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "")
+    : username || "player";
   const currentCardUrl = typeof window !== "undefined" ? `${window.location.origin}/card/${currentCardSlug}` : "";
 
   const shareToX = () => {
-    const text = encodeURIComponent(`⚡ Check out my Gamer Card: ${username} [${powerLevel} PWR | ${rankTier}] | Main: ${mainGame}! Can your stats beat mine? #GamerGreetings`);
+    const text = encodeURIComponent(
+      `⚡ Check out my Gamer Card: ${username} [${powerLevel} PWR | ${rankTier}] | Main: ${mainGame}! Can your stats beat mine? #GamerGreetings`
+    );
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(currentCardUrl)}`, "_blank");
   };
 
   const shareToReddit = () => {
-    const title = encodeURIComponent(`[Gamer Card] ${username} - ${rankTier} (PWR: ${powerLevel}) - Main: ${mainGame}`);
+    const title = encodeURIComponent(
+      `[Gamer Card] ${username} - ${rankTier} (PWR: ${powerLevel}) - Main: ${mainGame}`
+    );
     window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(currentCardUrl)}&title=${title}`, "_blank");
   };
 
@@ -532,7 +582,9 @@ export default function Home() {
   const activePerksList = AVAILABLE_PERKS.filter((p) => selectedPerks.includes(p.id));
 
   const qrHex = theme.accent.replace("#", "");
-  const liveTargetSlug = vanitySlug.trim() ? vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") : (username || "player");
+  const liveTargetSlug = vanitySlug.trim()
+    ? vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "")
+    : username || "player";
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://gamergreetings.vercel.app/card/${liveTargetSlug}&color=${qrHex}&bgcolor=0a0a10`;
 
   return (
@@ -585,9 +637,21 @@ export default function Home() {
         }
       `}</style>
 
-      {/* Standout Main Header */}
+      {/* Standout Main Header with 128x128 Scaled Logo Badge */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <img
+            src="/logo.svg"
+            alt="GG Logo"
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "12px",
+              boxShadow: "0 0 20px rgba(217, 70, 239, 0.45)",
+              border: "1px solid rgba(217, 70, 239, 0.5)",
+            }}
+          />
+
           <h1
             style={{
               letterSpacing: "5px",
@@ -602,6 +666,7 @@ export default function Home() {
           >
             GG&apos;s: GAMER GREETINGS
           </h1>
+
           <button
             onClick={toggleSound}
             title="Toggle SFX"
@@ -1404,7 +1469,7 @@ export default function Home() {
 
             {/* Digital Pro Pass */}
             <a
-              href="https://buy.stripe.com/bJe28kgZs51uaXOcPVefC01"
+              href="https://buy.stripe.com/bJe28kgZs51uaX0cPVefC01"
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -1434,7 +1499,7 @@ export default function Home() {
 
             {/* Physical Holo Card */}
             <a
-              href="https://buy.stripe.com/dRmdR2aB4ctWaXO17defC03"
+              href="https://buy.stripe.com/YOUR_PHYSICAL_CARD_LINK"
               target="_blank"
               rel="noopener noreferrer"
               style={{

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="128" height="128">
+  <defs>
+    <radialGradient id="bubbleBg" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#181428" />
+      <stop offset="100%" stop-color="#08070e" />
+    </radialGradient>
+    <linearGradient id="bubbleGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff3b81" />
+      <stop offset="50%" stop-color="#d946ef" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+    <linearGradient id="bubbleGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <filter id="bubbleGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#000000" flood-opacity="0.8" />
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#d946ef" flood-opacity="0.45" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#bubbleBg)" stroke="#26223b" stroke-width="6" />
+  <circle cx="100" cy="110" r="14" fill="#38bdf8" opacity="0.4" />
+  <circle cx="410" cy="390" r="18" fill="#ec4899" opacity="0.4" />
+  <path d="M 420 120 L 428 140 L 448 148 L 428 156 L 420 176 L 412 156 L 392 148 L 412 140 Z" fill="#facc15" opacity="0.85" />
+  <path d="M 85 370 L 90 385 L 105 390 L 90 395 L 85 410 L 80 395 L 65 390 L 80 385 Z" fill="#38bdf8" opacity="0.75" />
+  <g filter="url(#bubbleGlow)">
+    <g transform="translate(10, 0)">
+      <path d="M 215 130 C 120 130 80 185 80 256 C 80 335 130 385 210 385 C 255 385 270 355 270 310 L 270 280 L 200 280 C 185 280 175 290 175 305 C 175 315 185 325 195 325 L 215 325 L 215 335 C 165 335 135 305 135 256 C 135 200 160 180 215 180 C 240 180 255 190 262 205 C 268 218 285 220 295 208 C 305 195 300 175 285 155 C 265 138 245 130 215 130 Z" fill="#120c24" stroke="#120c24" stroke-width="26" stroke-linejoin="round"/>
+      <path d="M 215 130 C 120 130 80 185 80 256 C 80 335 130 385 210 385 C 255 385 270 355 270 310 L 270 280 L 200 280 C 185 280 175 290 175 305 C 175 315 185 325 195 325 L 215 325 L 215 335 C 165 335 135 305 135 256 C 135 200 160 180 215 180 C 240 180 255 190 262 205 C 268 218 285 220 295 208 C 305 195 300 175 285 155 C 265 138 245 130 215 130 Z" fill="url(#bubbleGrad1)" />
+      <path d="M 125 210 C 135 165 170 148 215 148" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" opacity="0.8" />
+      <circle cx="115" cy="245" r="7" fill="#ffffff" opacity="0.75" />
+      <path d="M 220 365 C 160 365 135 330 130 290" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="10" stroke-linecap="round" />
+    </g>
+    <g transform="translate(195, 0)">
+      <path d="M 215 130 C 120 130 80 185 80 256 C 80 335 130 385 210 385 C 255 385 270 355 270 310 L 270 280 L 200 280 C 185 280 175 290 175 305 C 175 315 185 325 195 325 L 215 325 L 215 335 C 165 335 135 305 135 256 C 135 200 160 180 215 180 C 240 180 255 190 262 205 C 268 218 285 220 295 208 C 305 195 300 175 285 155 C 265 138 245 130 215 130 Z" fill="#120c24" stroke="#120c24" stroke-width="26" stroke-linejoin="round"/>
+      <path d="M 215 130 C 120 130 80 185 80 256 C 80 335 130 385 210 385 C 255 385 270 355 270 310 L 270 280 L 200 280 C 185 280 175 290 175 305 C 175 315 185 325 195 325 L 215 325 L 215 335 C 165 335 135 305 135 256 C 135 200 160 180 215 180 C 240 180 255 190 262 205 C 268 218 285 220 295 208 C 305 195 300 175 285 155 C 265 138 245 130 215 130 Z" fill="url(#bubbleGrad2)" />
+      <path d="M 125 210 C 135 165 170 148 215 148" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" opacity="0.8" />
+      <circle cx="115" cy="245" r="7" fill="#ffffff" opacity="0.75" />
+      <path d="M 220 365 C 160 365 135 330 130 290" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="10" stroke-linecap="round" />
+    </g>
+  </g>
+</svg>
