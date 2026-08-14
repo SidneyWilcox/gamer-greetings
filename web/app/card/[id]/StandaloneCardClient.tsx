@@ -433,7 +433,7 @@ export default function StandaloneCardClient({
                 { icon: "🎮", name: "PSN", val: card.psn_handle },
                 { icon: "🟢", name: "Xbox", val: card.xbox_handle },
                 { icon: "⚙️", name: "Steam", val: card.steam_handle },
-                { icon: "💜", name: "Twitch", val: twitch ?? card.twitch_handle },
+                { icon: "💜", name: "Twitch", val: card.twitch_handle },
               ]
                 .filter((h) => h.val)
                 .map((h) => (
@@ -462,7 +462,7 @@ export default function StandaloneCardClient({
           <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", gap: "5px" }}>
             {[
               { name: "APM", val: card.apm, col: "#06b6d4" },
-              { name: "LUCK", val: luck ?? card.luck, col: "#c084fc" },
+              { name: "LUCK", val: card.luck, col: "#c084fc" },
               { name: "SALT", val: card.salt, col: "#ef4444" },
             ].map((bar) => (
               <div key={bar.name}>
