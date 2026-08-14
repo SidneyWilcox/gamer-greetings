@@ -1469,7 +1469,7 @@ export default function Home() {
 
             {/* Digital Pro Pass */}
             <a
-              href="https://buy.stripe.com/bJe28kgZs51uaX0cPVefC01"
+              href="https://buy.stripe.com/bJe28kgZs51uaX0cPV"
               target="_blank"
               rel="noopener noreferrer"
               style={{
