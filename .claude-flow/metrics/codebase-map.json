@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-08-14T11:10:10.947Z",
+  "projectRoot": "C:\\Users\\Sidney\\gamer-greetings",
+  "structure": {
+    "hasPackageJson": false,
+    "hasTsConfig": false,
+    "hasClaudeConfig": true,
+    "hasClaudeFlow": true
+  },
+  "scannedAt": 1786705810947
+}

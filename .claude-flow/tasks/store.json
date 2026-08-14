@@ -1,0 +1,33 @@
+{
+  "tasks": {
+    "task-1786662814573-z8tlag": {
+      "taskId": "task-1786662814573-z8tlag",
+      "type": "implementation",
+      "description": "Auto-assign",
+      "priority": "normal",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [],
+      "createdAt": "2026-08-13T23:13:34.573Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1786662996462-uaverp": {
+      "taskId": "task-1786662996462-uaverp",
+      "type": "implementation",
+      "description": "Build GG MVP App",
+      "priority": "normal",
+      "status": "in_progress",
+      "progress": 0,
+      "assignedTo": [
+        "gg-builder"
+      ],
+      "tags": [],
+      "createdAt": "2026-08-13T23:16:36.462Z",
+      "startedAt": "2026-08-13T23:22:27.616Z",
+      "completedAt": null
+    }
+  },
+  "version": "3.0.0"
+}

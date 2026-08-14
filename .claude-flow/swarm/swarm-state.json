@@ -1,0 +1,25 @@
+{
+  "swarms": {
+    "swarm-1786662929180-6tg30g": {
+      "swarmId": "swarm-1786662929180-6tg30g",
+      "topology": "hierarchical",
+      "maxAgents": 15,
+      "status": "running",
+      "agents": [
+        "agent-1786663337855-ixrs4j"
+      ],
+      "tasks": [],
+      "config": {
+        "topology": "hierarchical",
+        "maxAgents": 15,
+        "strategy": "specialized",
+        "communicationProtocol": "message-bus",
+        "autoScaling": true,
+        "consensusMechanism": "majority"
+      },
+      "createdAt": "2026-08-13T23:15:29.180Z",
+      "updatedAt": "2026-08-13T23:15:29.180Z"
+    }
+  },
+  "version": "3.0.0"
+}
