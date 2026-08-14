@@ -12,6 +12,7 @@ interface GamerCard {
   apm: number;
   luck: number;
   salt: number;
+  tilt_res?: number;
   win_rate?: number;
   clutch_rate?: number;
   hours_played?: number;
@@ -52,6 +53,31 @@ const LEADERBOARD_CATEGORIES = [
   { id: "hours_played", label: "⏳ HOURS" },
 ];
 
+// Stat Title Evaluator
+function getStatTitle(type: "apm" | "luck" | "salt" | "tiltRes", val: number): string {
+  if (type === "apm") {
+    if (val > 80) return "Keyboard Shredder";
+    if (val > 45) return "Rapid Tactician";
+    return "Turtle Fingers";
+  }
+  if (type === "luck") {
+    if (val > 80) return "Miracle Worker";
+    if (val > 45) return "Balanced Dice";
+    return "RNG Cursed";
+  }
+  if (type === "salt") {
+    if (val > 80) return "Desk Breaker";
+    if (val > 45) return "Mildly Tilted";
+    return "Monk Zen";
+  }
+  if (type === "tiltRes") {
+    if (val > 80) return "Iron Will";
+    if (val > 45) return "Sturdy Focus";
+    return "Glass Mental";
+  }
+  return "";
+}
+
 export default function Home() {
   const [username, setUsername] = useState("PLAYER_ONE");
   const [vanitySlug, setVanitySlug] = useState("");
@@ -60,6 +86,7 @@ export default function Home() {
   const [apm, setApm] = useState(65);
   const [luck, setLuck] = useState(50);
   const [salt, setSalt] = useState(40);
+  const [tiltRes, setTiltRes] = useState(70);
   const [winRate, setWinRate] = useState(60);
   const [clutchRate, setClutchRate] = useState(45);
   const [hoursPlayed, setHoursPlayed] = useState(1250);
@@ -76,6 +103,10 @@ export default function Home() {
   const [twitch, setTwitch] = useState("");
   const [showHandles, setShowHandles] = useState(false);
   const [showQrCode, setShowQrCode] = useState(true);
+
+  // Deck / Binder Collection State
+  const [collection, setCollection] = useState<GamerCard[]>([]);
+  const [isBinderOpen, setIsBinderOpen] = useState(false);
 
   // Leaderboard Filtering & Sorting State
   const [activeCategory, setActiveCategory] = useState("power_level");
@@ -95,19 +126,29 @@ export default function Home() {
   const cardWrapperRef = useRef<HTMLDivElement>(null);
   const prevHoloRef = useRef(false);
 
+  // Load Saved Binder Collection from LocalStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("gg_card_collection");
+      if (saved) setCollection(JSON.parse(saved));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   // Compute Power Level & Rank Tier
   const { powerLevel, rankTier, isHolo } = useMemo(() => {
     const hoursBonus = Math.min(Math.floor(Math.sqrt(hoursPlayed) * 2), 60);
-    const score = Math.round((apm * 1.4) + (winRate * 1.8) + (clutchRate * 1.2) + hoursBonus);
+    const score = Math.round((apm * 1.3) + (winRate * 1.6) + (clutchRate * 1.1) + (tiltRes * 0.4) + hoursBonus);
     
     let tier = "BRONZE NOOB";
-    if (score >= 380) tier = "🔥 APEX PREDATOR (S-TIER)";
-    else if (score >= 280) tier = "💎 DIAMOND ELITE";
-    else if (score >= 200) tier = "🥇 GOLD WARRIOR";
-    else if (score >= 120) tier = "🥈 SILVER GRINDER";
+    if (score >= 400) tier = "🔥 APEX PREDATOR (S-TIER)";
+    else if (score >= 300) tier = "💎 DIAMOND ELITE";
+    else if (score >= 220) tier = "🥇 GOLD WARRIOR";
+    else if (score >= 140) tier = "🥈 SILVER GRINDER";
 
-    return { powerLevel: score, rankTier: tier, isHolo: score >= 380 };
-  }, [apm, winRate, clutchRate, hoursPlayed]);
+    return { powerLevel: score, rankTier: tier, isHolo: score >= 400 };
+  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed]);
 
   // Trigger Power-up SFX when unlocking Apex S-Tier
   useEffect(() => {
@@ -236,6 +277,7 @@ export default function Home() {
       apm,
       luck,
       salt,
+      tilt_res: tiltRes,
       win_rate: winRate,
       clutch_rate: clutchRate,
       hours_played: hoursPlayed,
@@ -266,6 +308,32 @@ export default function Home() {
       await fetchLeaderboard();
     }
     setIsSaving(false);
+  };
+
+  // Add Card to Local Collection Binder
+  const handleAddToCollection = (cardToCollect?: GamerCard) => {
+    const target: GamerCard = cardToCollect || {
+      username: username || "ANONYMOUS",
+      slug: vanitySlug || undefined,
+      apm,
+      luck,
+      salt,
+      tilt_res: tiltRes,
+      win_rate: winRate,
+      clutch_rate: clutchRate,
+      hours_played: hoursPlayed,
+      power_level: powerLevel,
+      rank_tier: rankTier,
+      badge: theme.badge,
+      theme: themeName,
+      avatar_url: avatarUrl,
+      class_role: classRole,
+    };
+
+    const updated = [target, ...collection.filter((c) => c.username !== target.username)];
+    setCollection(updated);
+    localStorage.setItem("gg_card_collection", JSON.stringify(updated));
+    sound.playPowerUp();
   };
 
   const handleDownload = async () => {
@@ -322,6 +390,10 @@ export default function Home() {
       }}
     >
       <style>{`
+        @keyframes headerGlow {
+          0%, 100% { text-shadow: 0 0 15px rgba(6,182,212,0.8), 0 0 35px rgba(244,63,94,0.4); }
+          50% { text-shadow: 0 0 25px rgba(244,63,94,0.9), 0 0 45px rgba(6,182,212,0.6); }
+        }
         @keyframes holoSheenContinuous {
           0% { transform: translateX(-150%) translateY(-150%) rotate(45deg); }
           100% { transform: translateX(160%) translateY(160%) rotate(45deg); }
@@ -352,40 +424,133 @@ export default function Home() {
         }
       `}</style>
 
-      {/* Top Header & SFX Mute Toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px" }}>
-        <h1
-          style={{
-            letterSpacing: "4px",
-            color: theme.accent,
-            fontSize: "28px",
-            fontWeight: "900",
-            margin: 0,
-            textShadow: `0 0 10px ${theme.accent}`,
-          }}
-        >
-          GAMER GREETINGS
-        </h1>
-        <button
-          onClick={toggleSound}
-          title="Toggle SFX"
-          style={{
-            backgroundColor: "#171720",
-            border: `1px solid ${sfxMuted ? "#444" : theme.accent}`,
-            color: sfxMuted ? "#666" : theme.accent,
-            borderRadius: "50%",
-            width: "36px",
-            height: "36px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "14px",
-            cursor: "pointer",
-          }}
-        >
-          {sfxMuted ? "🔇" : "🔊"}
-        </button>
+      {/* Standout Main Header */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "28px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <h1
+            style={{
+              letterSpacing: "5px",
+              fontSize: "36px",
+              fontWeight: "950",
+              margin: 0,
+              background: "linear-gradient(90deg, #06b6d4 0%, #ffffff 40%, #f43f5e 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              animation: "headerGlow 4s infinite ease-in-out",
+            }}
+          >
+            GG&apos;s: GAMER GREETINGS
+          </h1>
+          <button
+            onClick={toggleSound}
+            title="Toggle SFX"
+            style={{
+              backgroundColor: "#171720",
+              border: `1px solid ${sfxMuted ? "#444" : theme.accent}`,
+              color: sfxMuted ? "#666" : theme.accent,
+              borderRadius: "50%",
+              width: "38px",
+              height: "38px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "15px",
+              cursor: "pointer",
+            }}
+          >
+            {sfxMuted ? "🔇" : "🔊"}
+          </button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "6px" }}>
+          <span style={{ fontSize: "11px", letterSpacing: "3px", color: "#888", fontWeight: 700 }}>
+            // COLLECTIBLE CYBER CARD LAB
+          </span>
+          <button
+            onClick={() => {
+              setIsBinderOpen(!isBinderOpen);
+              sound.playTick(60);
+            }}
+            style={{
+              backgroundColor: "#1a1a24",
+              border: `1px solid ${collection.length > 0 ? "#06b6d4" : "#444"}`,
+              color: collection.length > 0 ? "#06b6d4" : "#888",
+              borderRadius: "14px",
+              padding: "2px 10px",
+              fontSize: "10px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            🎴 POCKET BINDER ({collection.length})
+          </button>
+        </div>
       </div>
+
+      {/* Pocket Binder Drawer */}
+      {isBinderOpen && (
+        <div
+          style={{
+            maxWidth: "980px",
+            width: "100%",
+            backgroundColor: "#0d0d14",
+            border: "1px solid #06b6d4",
+            borderRadius: "16px",
+            padding: "16px 20px",
+            marginBottom: "24px",
+            boxShadow: "0 0 30px rgba(6,182,212,0.15)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <span style={{ fontSize: "12px", fontWeight: "bold", color: "#06b6d4", letterSpacing: "1px" }}>
+              🎴 YOUR COLLECTED CARDS DECK ({collection.length})
+            </span>
+            <button
+              onClick={() => setIsBinderOpen(false)}
+              style={{ background: "transparent", border: "none", color: "#666", cursor: "pointer", fontSize: "14px" }}
+            >
+              ✕
+            </button>
+          </div>
+          {collection.length === 0 ? (
+            <p style={{ fontSize: "12px", color: "#666", margin: 0 }}>
+              No cards collected yet! Click &quot;ADD TO BINDER&quot; below your card to save your favorite loadouts.
+            </p>
+          ) : (
+            <div style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "8px" }}>
+              {collection.map((c, i) => (
+                <div
+                  key={i}
+                  onClick={() => {
+                    setUsername(c.username);
+                    setApm(c.apm);
+                    setLuck(c.luck);
+                    setSalt(c.salt);
+                    if (c.tilt_res) setTiltRes(c.tilt_res);
+                    if (c.win_rate) setWinRate(c.win_rate);
+                    if (c.clutch_rate) setClutchRate(c.clutch_rate);
+                    if (c.avatar_url) setAvatarUrl(c.avatar_url);
+                    if (c.class_role) setClassRole(c.class_role);
+                    sound.playPowerUp();
+                  }}
+                  style={{
+                    backgroundColor: "#161622",
+                    border: "1px solid #28283c",
+                    borderRadius: "10px",
+                    padding: "10px",
+                    minWidth: "140px",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <div style={{ fontSize: "11px", fontWeight: "bold", color: "#fff" }}>{c.username}</div>
+                  <div style={{ fontSize: "9px", color: "#06b6d4", marginTop: "2px" }}>⚡ PWR {c.power_level ?? 100}</div>
+                  <div style={{ fontSize: "8px", color: "#888", marginTop: "2px" }}>{c.class_role ?? "DPS"}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         style={{
@@ -526,36 +691,47 @@ export default function Home() {
             <input type="file" accept="image/*" onChange={handleImageUpload} style={{ fontSize: "10px", color: "#aaa" }} />
           </div>
 
-          {/* Sliders with Reactive Audio Ticks */}
+          {/* Dynamic Stat Sliders */}
           <span style={{ fontSize: "10px", color: "#666", letterSpacing: "1px", display: "block", margin: "12px 0 8px 0" }}>
-            // CORE STATS
+            // CORE STATS & SPECIALIZATION
           </span>
           {[
-            { label: "APM", val: apm, set: setApm },
-            { label: "LUCK", val: luck, set: setLuck },
-            { label: "SALT", val: salt, set: setSalt },
-            { label: "WIN RATE", val: winRate, set: setWinRate },
-            { label: "CLUTCH RATE", val: clutchRate, set: setClutchRate },
-          ].map((s) => (
-            <div key={s.label} style={{ marginBottom: "10px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px", color: "#aaa" }}>
-                <span>{s.label}</span>
-                <span style={{ color: theme.accent, fontWeight: "bold" }}>{s.val}%</span>
+            { label: "APM", type: "apm" as const, val: apm, set: setApm },
+            { label: "LUCK", type: "luck" as const, val: luck, set: setLuck },
+            { label: "SALT", type: "salt" as const, val: salt, set: setSalt },
+            { label: "TILT RESISTANCE", type: "tiltRes" as const, val: tiltRes, set: setTiltRes },
+            { label: "WIN RATE", type: null, val: winRate, set: setWinRate },
+            { label: "CLUTCH RATE", type: null, val: clutchRate, set: setClutchRate },
+          ].map((s) => {
+            const subtitle = s.type ? getStatTitle(s.type, s.val) : null;
+            return (
+              <div key={s.label} style={{ marginBottom: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", marginBottom: "4px", color: "#aaa" }}>
+                  <div>
+                    <span>{s.label}</span>
+                    {subtitle && (
+                      <span style={{ fontSize: "9px", color: theme.accent, marginLeft: "6px", fontWeight: "bold" }}>
+                        ({subtitle})
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: theme.accent, fontWeight: "bold" }}>{s.val}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={s.val}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    s.set(v);
+                    sound.playTick(v);
+                  }}
+                  style={{ width: "100%", accentColor: theme.accent }}
+                />
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={s.val}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  s.set(v);
-                  sound.playTick(v);
-                }}
-                style={{ width: "100%", accentColor: theme.accent }}
-              />
-            </div>
-          ))}
+            );
+          })}
 
           {/* Hours Input */}
           <div style={{ marginTop: "12px", marginBottom: "14px" }}>
@@ -667,6 +843,23 @@ export default function Home() {
               }}
             >
               {isSaving ? "SAVING..." : "SAVE TO LEADERBOARD"}
+            </button>
+
+            <button
+              onClick={() => handleAddToCollection()}
+              style={{
+                width: "100%",
+                backgroundColor: "#1c1c28",
+                color: "#fff",
+                border: "1px solid #333348",
+                padding: "10px",
+                borderRadius: "8px",
+                fontWeight: "700",
+                letterSpacing: "1px",
+                cursor: "pointer",
+              }}
+            >
+              🎴 ADD TO POCKET BINDER
             </button>
 
             <button
@@ -875,7 +1068,7 @@ export default function Home() {
                 </span>
               </div>
 
-              {/* Quick Metrics Badges & Dynamic Colored QR Code */}
+              {/* Quick Metrics Badges & QR Code */}
               <div style={{ display: "flex", gap: "6px", alignItems: "stretch" }}>
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
                   <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", padding: "4px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.12)", textAlign: "center", backdropFilter: "blur(6px)" }}>
@@ -888,7 +1081,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Scannable Dynamic QR Code */}
                 {showQrCode && (
                   <div
                     style={{
@@ -951,15 +1143,16 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Core Bar Displays */}
+            {/* Core Bar Displays with Dynamic Trait Titles */}
             <div style={{ position: "relative", zIndex: 5, display: "flex", flexDirection: "column", gap: "5px" }}>
               {[
-                { name: "APM", val: apm, col: "#06b6d4" },
-                { name: "LUCK", val: luck, col: "#c084fc" },
-                { name: "SALT", val: salt, col: "#ef4444" },
+                { name: `APM • ${getStatTitle("apm", apm)}`, val: apm, col: "#06b6d4" },
+                { name: `LUCK • ${getStatTitle("luck", luck)}`, val: luck, col: "#c084fc" },
+                { name: `SALT • ${getStatTitle("salt", salt)}`, val: salt, col: "#ef4444" },
+                { name: `TILT RES • ${getStatTitle("tiltRes", tiltRes)}`, val: tiltRes, col: "#38bdf8" },
               ].map((bar) => (
                 <div key={bar.name}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "8px", color: "#ccc", marginBottom: "2px", textShadow: "0 1px 2px #000" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "7.5px", color: "#ccc", marginBottom: "2px", textShadow: "0 1px 2px #000" }}>
                     <span>{bar.name}</span>
                     <span>{bar.val}%</span>
                   </div>
@@ -1107,6 +1300,22 @@ export default function Home() {
 
                   {identifier && (
                     <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => handleAddToCollection(card)}
+                        title="Collect this card to your binder"
+                        style={{
+                          fontSize: "10px",
+                          backgroundColor: "#161622",
+                          border: "1px solid #333348",
+                          color: "#fff",
+                          padding: "4px 8px",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        + BINDER
+                      </button>
                       <a
                         href={`/card/${identifier}`}
                         target="_blank"
