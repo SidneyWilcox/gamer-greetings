@@ -1499,7 +1499,7 @@ export default function Home() {
 
             {/* Physical Holo Card */}
             <a
-              href="https://buy.stripe.com/YOUR_PHYSICAL_CARD_LINK"
+              href="https://buy.stripe.com/dRmdR2aB4ctWaXO17defC03"
               target="_blank"
               rel="noopener noreferrer"
               style={{
