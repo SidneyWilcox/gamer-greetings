@@ -5,7 +5,7 @@ import { toPng } from "html-to-image";
 import { supabase } from "./supabase";
 import { sound } from "./audio";
 
-const STRIPE_PRO_LINK = "https://buy.stripe.com/7sY28k9x0gKc5Du2bhefC06";
+const STRIPE_PRO_LINK = "https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04";
 
 interface GamerCard {
   id?: string;
@@ -489,7 +489,7 @@ export default function Home() {
       theme: themeName,
       avatar_url: avatarUrl,
       class_role: classRole,
-      main_game: mainGame,
+      main_game: mainGame || "Valorant",
       perks: selectedPerks,
       discord_handle: discord || undefined,
       psn_handle: psn || undefined,
@@ -536,7 +536,7 @@ export default function Home() {
       theme: themeName,
       avatar_url: avatarUrl,
       class_role: classRole,
-      main_game: mainGame,
+      main_game: mainGame || "Valorant",
       perks: selectedPerks,
       is_pro: isProUser,
     };
@@ -590,14 +590,14 @@ export default function Home() {
 
   const shareToX = () => {
     const text = encodeURIComponent(
-      `⚡ Check out my Gamer Card: ${username} [${powerLevel} PWR | ${rankTier}] | Main: ${mainGame}! Can your stats beat mine? #GamerGreetings`
+      `⚡ Check out my Gamer Card: ${username} [${powerLevel} PWR | ${rankTier}] | Main: ${mainGame || "Gaming"}! Can your stats beat mine? #GamerGreetings`
     );
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(currentCardUrl)}`, "_blank");
   };
 
   const shareToReddit = () => {
     const title = encodeURIComponent(
-      `[Gamer Card] ${username} - ${rankTier} (PWR: ${powerLevel}) - Main: ${mainGame}`
+      `[Gamer Card] ${username} - ${rankTier} (PWR: ${powerLevel}) - Main: ${mainGame || "Gaming"}`
     );
     window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(currentCardUrl)}&title=${title}`, "_blank");
   };
@@ -660,7 +660,7 @@ export default function Home() {
           100% { transform: translateY(-500px) translateX(-35px); opacity: 0; }
         }
         @keyframes floatUp3 {
-          0% { transform: translateY(0) translateX(0); opacity: 0; }
+          0% { transform: translateY(0) translateX(0); opacity: 1; }
           20% { opacity: 1; }
           80% { opacity: 0.9; }
           100% { transform: translateY(-460px) translateX(20px); opacity: 0; }
@@ -1263,35 +1263,63 @@ export default function Home() {
             />
           </div>
 
-          {/* Main Game Selector */}
+          {/* Main Game Selector with Custom Title Input */}
           <div style={{ marginBottom: "16px" }}>
             <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
               CURRENT MAIN TITLE
             </label>
-            <select
-              value={mainGame}
-              onChange={(e) => {
-                setMainGame(e.target.value);
-                sound.playTick(65);
-              }}
-              style={{
-                width: "100%",
-                backgroundColor: "#1b1b24",
-                border: "1px solid #282836",
-                borderRadius: "8px",
-                padding: "10px",
-                color: "#fff",
-                fontWeight: "bold",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            >
-              {POPULAR_GAMES.map((game) => (
-                <option key={game} value={game}>
-                  🎮 {game}
-                </option>
-              ))}
-            </select>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <select
+                value={POPULAR_GAMES.includes(mainGame) ? mainGame : "OTHER"}
+                onChange={(e) => {
+                  if (e.target.value === "OTHER") {
+                    setMainGame("");
+                  } else {
+                    setMainGame(e.target.value);
+                  }
+                  sound.playTick(65);
+                }}
+                style={{
+                  width: "100%",
+                  backgroundColor: "#1b1b24",
+                  border: "1px solid #282836",
+                  borderRadius: "8px",
+                  padding: "10px",
+                  color: "#fff",
+                  fontWeight: "bold",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              >
+                {POPULAR_GAMES.map((game) => (
+                  <option key={game} value={game}>
+                    🎮 {game}
+                  </option>
+                ))}
+                <option value="OTHER">✍️ Other / Custom Title...</option>
+              </select>
+
+              {(!POPULAR_GAMES.includes(mainGame) || mainGame === "") && (
+                <input
+                  type="text"
+                  placeholder="Type custom game title (e.g. Helldivers 2, WOW)..."
+                  value={mainGame}
+                  onChange={(e) => setMainGame(e.target.value)}
+                  style={{
+                    width: "100%",
+                    backgroundColor: "#1b1b24",
+                    border: `1px solid ${theme.accent}`,
+                    borderRadius: "8px",
+                    padding: "8px 10px",
+                    color: "#fff",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              )}
+            </div>
           </div>
 
           {/* Gamer Perk Chips */}
@@ -1818,7 +1846,7 @@ export default function Home() {
                 <div style={{ position: "relative", zIndex: 5, display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
                   <div>
                     <span style={{ fontSize: "9px", color: "#ddd", letterSpacing: "1.5px", textShadow: "0 1px 4px #000" }}>
-                      🎮 {mainGame.toUpperCase()}
+                      🎮 {(mainGame || "GAMER").toUpperCase()}
                     </span>
                     <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0, letterSpacing: "1px", wordBreak: "break-word", textShadow: "0 2px 8px #000" }}>
                       {username || "ANONYMOUS"}
