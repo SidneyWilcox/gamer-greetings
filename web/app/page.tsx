@@ -5,6 +5,8 @@ import { toPng } from "html-to-image";
 import { supabase } from "./supabase";
 import { sound } from "./audio";
 
+const STRIPE_PRO_LINK = "https://buy.stripe.com/bJe28kgZs51uaX0cPV";
+
 interface GamerCard {
   id?: string;
   slug?: string;
@@ -113,6 +115,8 @@ const sanitizeHandle = (val: string) => val.replace(/^@+/, "").trim();
 
 export default function Home() {
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+  const [isProUser, setIsProUser] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
 
   const [username, setUsername] = useState("PLAYER_ONE");
   const [vanitySlug, setVanitySlug] = useState("");
@@ -147,12 +151,12 @@ export default function Home() {
   const [showHardware, setShowHardware] = useState(false);
   const [showQrCode, setShowQrCode] = useState(true);
 
-  // Collection & Duel Arena State
+  // Binder & Duel Arena
   const [collection, setCollection] = useState<GamerCard[]>([]);
   const [isBinderOpen, setIsBinderOpen] = useState(false);
   const [duelOpponent, setDuelOpponent] = useState<GamerCard | null>(null);
 
-  // Leaderboard Filtering State
+  // Leaderboard State
   const [activeCategory, setActiveCategory] = useState("power_level");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [leaderboard, setLeaderboard] = useState<GamerCard[]>([]);
@@ -171,9 +175,22 @@ export default function Home() {
   const cardWrapperRef = useRef<HTMLDivElement>(null);
   const prevHoloRef = useRef(false);
 
-  // Load Saved Drafts on Mount
+  // Verify Pro Status & Read URL Return Parameters on Mount
   useEffect(() => {
     try {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("pro") === "unlocked" || params.get("session_id")) {
+          localStorage.setItem("gg_pro_unlocked", "true");
+          setIsProUser(true);
+          sound.playPowerUp();
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          const unlocked = localStorage.getItem("gg_pro_unlocked") === "true";
+          setIsProUser(unlocked);
+        }
+      }
+
       const savedBinder = localStorage.getItem("gg_card_collection");
       if (savedBinder) setCollection(JSON.parse(savedBinder));
 
@@ -270,7 +287,7 @@ export default function Home() {
   const { powerLevel, rankTier, isHolo } = useMemo(() => {
     const hoursBonus = Math.min(Math.floor(Math.sqrt(hoursPlayed) * 2), 60);
     const perkBonus = selectedPerks.length * 10;
-    const proSkinBonus = proSkin !== "standard" ? 15 : 0;
+    const proSkinBonus = isProUser && proSkin !== "standard" ? 15 : 0;
     const score = Math.round(
       apm * 1.3 + winRate * 1.6 + clutchRate * 1.1 + tiltRes * 0.4 + hoursBonus + perkBonus + proSkinBonus
     );
@@ -282,7 +299,7 @@ export default function Home() {
     else if (score >= 140) tier = "🥈 SILVER GRINDER";
 
     return { powerLevel: score, rankTier: tier, isHolo: score >= 400 };
-  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed, selectedPerks, proSkin]);
+  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed, selectedPerks, proSkin, isProUser]);
 
   useEffect(() => {
     if (isHolo && !prevHoloRef.current) {
@@ -316,6 +333,16 @@ export default function Home() {
     sound.playTick(85);
   };
 
+  const handleSkinSelect = (skinId: "standard" | "obsidian" | "gold" | "matrix") => {
+    if (skinId !== "standard" && !isProUser) {
+      sound.playTick(40);
+      setShowProModal(true);
+      return;
+    }
+    setProSkin(skinId);
+    sound.playTick(75);
+  };
+
   let themeName = "default";
   let theme = {
     bg: "#08070e",
@@ -325,7 +352,7 @@ export default function Home() {
     badge: null as string | null,
   };
 
-  if (proSkin === "obsidian") {
+  if (isProUser && proSkin === "obsidian") {
     theme = {
       bg: "#040407",
       border: "2px solid #a855f7",
@@ -333,7 +360,7 @@ export default function Home() {
       accent: "#a855f7",
       badge: "🔮 OBSIDIAN PRO",
     };
-  } else if (proSkin === "gold") {
+  } else if (isProUser && proSkin === "gold") {
     theme = {
       bg: "#080602",
       border: "2px solid #eab308",
@@ -341,7 +368,7 @@ export default function Home() {
       accent: "#eab308",
       badge: "👑 24K GOLD PRO",
     };
-  } else if (proSkin === "matrix") {
+  } else if (isProUser && proSkin === "matrix") {
     theme = {
       bg: "#020803",
       border: "2px solid #22c55e",
@@ -434,8 +461,13 @@ export default function Home() {
   };
 
   const handleSaveToLeaderboard = async () => {
+    if (vanitySlug.trim() && !isProUser) {
+      setShowProModal(true);
+      return;
+    }
+
     setIsSaving(true);
-    const cleanSlug = vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+    const cleanSlug = isProUser ? vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") : undefined;
 
     const newCard: GamerCard = {
       username: username || "ANONYMOUS",
@@ -453,7 +485,7 @@ export default function Home() {
       hours_played: hoursPlayed,
       power_level: powerLevel,
       rank_tier: rankTier,
-      badge: theme.badge,
+      badge: isProUser ? theme.badge || "👑 PRO" : theme.badge,
       theme: themeName,
       avatar_url: avatarUrl,
       class_role: classRole,
@@ -464,7 +496,7 @@ export default function Home() {
       xbox_handle: xbox || undefined,
       steam_handle: steam || undefined,
       twitch_handle: twitch || undefined,
-      is_pro: proSkin !== "standard",
+      is_pro: isProUser,
     };
 
     const { error } = await supabase.from("gamer_cards").insert([newCard]);
@@ -486,7 +518,7 @@ export default function Home() {
   const handleAddToCollection = (cardToCollect?: GamerCard) => {
     const target: GamerCard = cardToCollect || {
       username: username || "ANONYMOUS",
-      slug: vanitySlug || undefined,
+      slug: isProUser ? vanitySlug || undefined : undefined,
       bio,
       hardware_gpu: gpu,
       hardware_hz: hz,
@@ -500,13 +532,13 @@ export default function Home() {
       hours_played: hoursPlayed,
       power_level: powerLevel,
       rank_tier: rankTier,
-      badge: theme.badge,
+      badge: isProUser ? theme.badge || "👑 PRO" : theme.badge,
       theme: themeName,
       avatar_url: avatarUrl,
       class_role: classRole,
       main_game: mainGame,
       perks: selectedPerks,
-      is_pro: proSkin !== "standard",
+      is_pro: isProUser,
     };
 
     const updated = [target, ...collection.filter((c) => c.username !== target.username)];
@@ -571,6 +603,10 @@ export default function Home() {
   };
 
   const copyIframeEmbed = () => {
+    if (!isProUser) {
+      setShowProModal(true);
+      return;
+    }
     const embedCode = `<iframe src="${currentCardUrl}" width="340" height="560" frameborder="0" allowtransparency="true"></iframe>`;
     navigator.clipboard.writeText(embedCode);
     sound.playConfirm();
@@ -637,20 +673,139 @@ export default function Home() {
         }
       `}</style>
 
-      {/* Standout Main Header with 128x128 Scaled Logo Badge */}
+      {/* Paywall Upsell Modal */}
+      {showProModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(5, 5, 8, 0.88)",
+            backdropFilter: "blur(8px)",
+            zIndex: 200,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#111118",
+              border: "2px solid #e11d48",
+              boxShadow: "0 0 45px rgba(225, 29, 72, 0.5)",
+              borderRadius: "20px",
+              padding: "32px 24px",
+              maxWidth: "460px",
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: "36px", marginBottom: "8px" }}>👑</div>
+            <h2 style={{ fontSize: "20px", fontWeight: "900", color: "#fff", margin: "0 0 8px 0", letterSpacing: "1px" }}>
+              UNLOCK DIGITAL PRO PASS
+            </h2>
+            <p style={{ fontSize: "12px", color: "#aaa", margin: "0 0 20px 0", lineHeight: "1.5" }}>
+              Exclusive access to <strong>Obsidian Void</strong>, <strong>24K Gold Foil</strong>, <strong>Matrix Cyber</strong> themes, reserved custom vanity URLs, +15 Power Level Stat Boost, and the verified PRO leaderboard crest.
+            </p>
+
+            <a
+              href={STRIPE_PRO_LINK}
+              style={{
+                display: "block",
+                width: "100%",
+                backgroundColor: "#e11d48",
+                color: "#fff",
+                textDecoration: "none",
+                padding: "12px",
+                borderRadius: "8px",
+                fontWeight: "900",
+                fontSize: "14px",
+                letterSpacing: "1px",
+                boxShadow: "0 0 20px rgba(225, 29, 72, 0.4)",
+                boxSizing: "border-box",
+                marginBottom: "10px",
+              }}
+            >
+              UNLOCK INSTANTLY FOR $3.99
+            </a>
+
+            <button
+              onClick={() => setShowProModal(false)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#777",
+                fontSize: "12px",
+                cursor: "pointer",
+                padding: "6px",
+              }}
+            >
+              Maybe Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Header with Inline SVG Bubble Logo */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <img
-            src="/logo.svg"
-            alt="GG Logo"
+          
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 512 512"
+            width="44"
+            height="44"
             style={{
-              width: "48px",
-              height: "48px",
+              minWidth: "44px",
+              minHeight: "44px",
               borderRadius: "12px",
               boxShadow: "0 0 20px rgba(217, 70, 239, 0.45)",
               border: "1px solid rgba(217, 70, 239, 0.5)",
+              display: "block",
             }}
-          />
+          >
+            <defs>
+              <radialGradient id="bubbleBg" cx="50%" cy="50%" r="55%">
+                <stop offset="0%" stopColor="#181428" />
+                <stop offset="100%" stopColor="#08070e" />
+              </radialGradient>
+              <linearGradient id="bubbleGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#ff3b81" />
+                <stop offset="50%" stopColor="#d946ef" />
+                <stop offset="100%" stopColor="#8b5cf6" />
+              </linearGradient>
+              <linearGradient id="bubbleGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#38bdf8" />
+                <stop offset="50%" stopColor="#06b6d4" />
+                <stop offset="100%" stopColor="#3b82f6" />
+              </linearGradient>
+              <filter id="bubbleGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="16" stdDeviation="14" floodColor="#000000" floodOpacity="0.8" />
+                <feDropShadow dx="0" dy="0" stdDeviation="12" floodColor="#d946ef" floodOpacity="0.45" />
+              </filter>
+            </defs>
+            <rect width="512" height="512" rx="120" fill="url(#bubbleBg)" stroke="#26223b" strokeWidth="6" />
+            <circle cx="100" cy="110" r="14" fill="#38bdf8" opacity="0.4" />
+            <circle cx="410" cy="390" r="18" fill="#ec4899" opacity="0.4" />
+            <path d="M 420 120 L 428 140 L 448 148 L 428 156 L 420 176 L 412 156 L 392 148 L 412 140 Z" fill="#facc15" opacity="0.85" />
+            <path d="M 85 370 L 90 385 L 105 390 L 90 395 L 85 410 L 80 395 L 65 390 L 80 385 Z" fill="#38bdf8" opacity="0.75" />
+            <g filter="url(#bubbleGlow)">
+              <g transform="translate(10, 0)">
+                <path d="M 215 130 C 120 130 80 185 80 256 C 80 335 130 385 210 385 C 255 385 270 355 270 310 L 270 280 L 200 280 C 185 280 175 290 175 305 C 175 315 185 325 195 325 L 215 325 L 215 335 C 165 335 135 305 135 256 C 135 200 160 180 215 180 C 240 180 255 190 262 205 C 268 218 285 220 295 208 C 305 195 300 175 285 155 C 265 138 245 130 215 130 Z" fill="#120c24" stroke="#120c24" strokeWidth="26" strokeLinejoin="round"/>
+                <path d="M 215 130 C 120 130 80 185 80 256 C 80 335 130 385 210 385 C 255 385 270 355 270 310 L 270 280 L 200 280 C 185 280 175 290 175 305 C 175 315 185 325 195 325 L 215 325 L 215 335 C 165 335 135 305 135 256 C 135 200 160 180 215 180 C 240 180 255 190 262 205 C 268 218 285 220 295 208 C 305 195 300 175 285 155 C 265 138 245 130 215 130 Z" fill="url(#bubbleGrad1)" />
+                <path d="M 125 210 C 135 165 170 148 215 148" fill="none" stroke="#ffffff" strokeWidth="12" strokeLinecap="round" opacity="0.8" />
+              </g>
+              <g transform="translate(195, 0)">
+                <path d="M 215 130 C 120 130 80 185 80 256 C 80 335 130 385 210 385 C 255 385 270 355 270 310 L 270 280 L 200 280 C 185 280 175 290 175 305 C 175 315 185 325 195 325 L 215 325 L 215 335 C 165 335 135 305 135 256 C 135 200 160 180 215 180 C 240 180 255 190 262 205 C 268 218 285 220 295 208 C 305 195 300 175 285 155 C 265 138 245 130 215 130 Z" fill="#120c24" stroke="#120c24" strokeWidth="26" strokeLinejoin="round"/>
+                <path d="M 215 130 C 120 130 80 185 80 256 C 80 335 130 385 210 385 C 255 385 270 355 270 310 L 270 280 L 200 280 C 185 280 175 290 175 305 C 175 315 185 325 195 325 L 215 325 L 215 335 C 165 335 135 305 135 256 C 135 200 160 180 215 180 C 240 180 255 190 262 205 C 268 218 285 220 295 208 C 305 195 300 175 285 155 C 265 138 245 130 215 130 Z" fill="url(#bubbleGrad2)" />
+                <path d="M 125 210 C 135 165 170 148 215 148" fill="none" stroke="#ffffff" strokeWidth="12" strokeLinecap="round" opacity="0.8" />
+              </g>
+            </g>
+          </svg>
 
           <h1
             style={{
@@ -687,10 +842,16 @@ export default function Home() {
             {sfxMuted ? "🔇" : "🔊"}
           </button>
         </div>
+
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "6px" }}>
           <span style={{ fontSize: "11px", letterSpacing: "3px", color: "#888", fontWeight: 700 }}>
             // COLLECTIBLE CYBER CARD LAB
           </span>
+          {isProUser && (
+            <span style={{ backgroundColor: "#eab30822", color: "#eab308", border: "1px solid #eab308", borderRadius: "12px", padding: "2px 8px", fontSize: "10px", fontWeight: "900" }}>
+              👑 PRO MEMBER
+            </span>
+          )}
           <button
             onClick={() => {
               setIsBinderOpen(!isBinderOpen);
@@ -976,17 +1137,27 @@ export default function Home() {
             />
           </div>
 
-          {/* Vanity Slug Field */}
+          {/* Vanity Slug Field with Pro Lock */}
           <div style={{ marginBottom: "16px" }}>
-            <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
-              CUSTOM CARD SLUG (URL)
-            </label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px" }}>
+                CUSTOM CARD SLUG (URL)
+              </label>
+              {!isProUser && (
+                <span
+                  onClick={() => setShowProModal(true)}
+                  style={{ fontSize: "9px", color: "#eab308", cursor: "pointer", fontWeight: "bold" }}
+                >
+                  🔒 PRO FEATURE
+                </span>
+              )}
+            </div>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 backgroundColor: "#1b1b24",
-                border: "1px solid #282836",
+                border: !isProUser ? "1px dashed #444" : "1px solid #282836",
                 borderRadius: "8px",
                 padding: "0 10px",
               }}
@@ -994,9 +1165,15 @@ export default function Home() {
               <span style={{ fontSize: "11px", color: "#666", marginRight: "4px" }}>/card/</span>
               <input
                 type="text"
-                placeholder="e.g. king-of-salem"
+                placeholder={isProUser ? "e.g. king-of-salem" : "Unlock Pro to reserve custom link"}
                 value={vanitySlug}
-                onChange={(e) => setVanitySlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                onChange={(e) => {
+                  if (!isProUser) {
+                    setShowProModal(true);
+                    return;
+                  }
+                  setVanitySlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                }}
                 style={{
                   width: "100%",
                   backgroundColor: "transparent",
@@ -1012,37 +1189,49 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Premium Skin Customizer */}
+          {/* Gated Premium Skin Customizer */}
           <div style={{ marginBottom: "16px" }}>
-            <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
-              COLLECTOR CARD THEME / SKIN
-            </label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px" }}>
+                COLLECTOR CARD THEME / SKIN
+              </label>
+              {!isProUser && (
+                <span
+                  onClick={() => setShowProModal(true)}
+                  style={{ fontSize: "9px", color: "#e11d48", cursor: "pointer", fontWeight: "bold" }}
+                >
+                  👑 UNLOCK PRO SKINS
+                </span>
+              )}
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
               {[
-                { id: "standard" as const, label: "Standard Cyber", col: "#06b6d4" },
-                { id: "obsidian" as const, label: "🔮 Obsidian Void", col: "#a855f7" },
-                { id: "gold" as const, label: "👑 24K Gold Foil", col: "#eab308" },
-                { id: "matrix" as const, label: "🟩 Matrix Cyber", col: "#22c55e" },
+                { id: "standard" as const, label: "Standard Cyber", col: "#06b6d4", locked: false },
+                { id: "obsidian" as const, label: "🔮 Obsidian Void", col: "#a855f7", locked: !isProUser },
+                { id: "gold" as const, label: "👑 24K Gold Foil", col: "#eab308", locked: !isProUser },
+                { id: "matrix" as const, label: "🟩 Matrix Cyber", col: "#22c55e", locked: !isProUser },
               ].map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => {
-                    setProSkin(s.id);
-                    sound.playTick(75);
-                  }}
+                  onClick={() => handleSkinSelect(s.id)}
                   style={{
-                    backgroundColor: proSkin === s.id ? `${s.col}22` : "#1b1b24",
-                    border: proSkin === s.id ? `2px solid ${s.col}` : "1px solid #282836",
-                    color: proSkin === s.id ? s.col : "#aaa",
+                    backgroundColor: proSkin === s.id && (isProUser || s.id === "standard") ? `${s.col}22` : "#1b1b24",
+                    border: proSkin === s.id && (isProUser || s.id === "standard") ? `2px solid ${s.col}` : "1px solid #282836",
+                    color: proSkin === s.id && (isProUser || s.id === "standard") ? s.col : s.locked ? "#777" : "#aaa",
                     borderRadius: "6px",
                     padding: "6px 8px",
                     fontSize: "10px",
                     fontWeight: "bold",
                     cursor: "pointer",
                     textAlign: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "4px",
                   }}
                 >
-                  {s.label}
+                  <span>{s.label}</span>
+                  {s.locked && <span style={{ fontSize: "9px" }}>🔒</span>}
                 </button>
               ))}
             </div>
@@ -1444,7 +1633,7 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Storefront & Monetization Upgrades */}
+          {/* Storefront & Monetization */}
           <div
             style={{
               backgroundColor: "#161624",
@@ -1469,14 +1658,14 @@ export default function Home() {
 
             {/* Digital Pro Pass */}
             <a
-              href="https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04"
+              href={STRIPE_PRO_LINK}
               target="_blank"
               rel="noopener noreferrer"
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                background: "#e11d48",
+                background: isProUser ? "#10b981" : "#e11d48",
                 color: "#fff",
                 textDecoration: "none",
                 padding: "10px 14px",
@@ -1484,48 +1673,19 @@ export default function Home() {
                 fontWeight: "800",
                 fontSize: "12px",
                 letterSpacing: "0.5px",
-                boxShadow: "0 0 15px rgba(225, 29, 72, 0.4)",
+                boxShadow: isProUser ? "0 0 15px rgba(16, 185, 129, 0.4)" : "0 0 15px rgba(225, 29, 72, 0.4)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span>⚡</span>
                 <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-                  <span>UNLOCK DIGITAL PRO PASS</span>
-                  <span style={{ fontSize: "9px", opacity: 0.85, fontWeight: "normal" }}>Obsidian, 24K Gold, Matrix Themes & Verified Crest</span>
+                  <span>{isProUser ? "DIGITAL PRO PASS ACTIVE" : "UNLOCK DIGITAL PRO PASS"}</span>
+                  <span style={{ fontSize: "9px", opacity: 0.85, fontWeight: "normal" }}>
+                    {isProUser ? "All Skins, Crests & Vanity URLs Unlocked" : "Obsidian, 24K Gold, Matrix Themes & Verified Crest"}
+                  </span>
                 </div>
               </div>
-              <span style={{ fontSize: "13px", fontWeight: "900" }}>$3.99</span>
-            </a>
-
-            {/* Physical Holo Card */}
-            <a
-              href="https://buy.stripe.com/dRmdR2aB4ctWaXO17defC03"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                backgroundColor: "#1f1f2e",
-                border: "1px solid #06b6d4",
-                color: "#06b6d4",
-                textDecoration: "none",
-                padding: "10px 14px",
-                borderRadius: "8px",
-                fontWeight: "800",
-                fontSize: "12px",
-                letterSpacing: "0.5px",
-                boxShadow: "0 0 15px rgba(6, 182, 212, 0.2)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>📦</span>
-                <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-                  <span>ORDER PHYSICAL HOLO CARD</span>
-                  <span style={{ fontSize: "9px", opacity: 0.85, fontWeight: "normal" }}>Custom Foil Print + Tap-to-Profile NFC Chip</span>
-                </div>
-              </div>
-              <span style={{ fontSize: "13px", fontWeight: "900" }}>$24.99</span>
+              <span style={{ fontSize: "13px", fontWeight: "900" }}>{isProUser ? "✓" : "$3.99"}</span>
             </a>
           </div>
         </div>
@@ -2039,8 +2199,8 @@ export default function Home() {
                           </span>
                         )}
                         {card.is_pro && (
-                          <span style={{ fontSize: "8px", backgroundColor: "rgba(244,63,94,0.2)", color: "#f43f5e", border: "1px solid #f43f5e", padding: "1px 4px", borderRadius: "3px", fontWeight: "bold" }}>
-                            PRO
+                          <span style={{ fontSize: "8px", backgroundColor: "rgba(234,179,8,0.2)", color: "#eab308", border: "1px solid #eab308", padding: "1px 4px", borderRadius: "3px", fontWeight: "bold" }}>
+                            👑 PRO
                           </span>
                         )}
                       </div>
