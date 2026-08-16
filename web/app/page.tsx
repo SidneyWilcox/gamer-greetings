@@ -5,7 +5,7 @@ import { toPng } from "html-to-image";
 import { supabase } from "./supabase";
 import { sound } from "./audio";
 
-const STRIPE_PRO_LINK = "https://buy.stripe.com/bJe28kgZs51uaX0cPV";
+const STRIPE_PRO_LINK = "https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04";
 
 interface GamerCard {
   id?: string;
@@ -713,7 +713,9 @@ export default function Home() {
             </p>
 
             <a
-              href={"https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04"}
+              href={STRIPE_PRO_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
                 display: "block",
                 width: "100%",
