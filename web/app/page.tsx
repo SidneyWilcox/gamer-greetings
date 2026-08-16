@@ -5,7 +5,7 @@ import { toPng } from "html-to-image";
 import { supabase } from "./supabase";
 import { sound } from "./audio";
 
-const STRIPE_PRO_LINK = "https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04";
+const STRIPE_PRO_LINK = "https://buy.stripe.com/7sY28k9x0gKc5Du2bhefC06";
 
 interface GamerCard {
   id?: string;
@@ -732,7 +732,7 @@ export default function Home() {
                 marginBottom: "10px",
               }}
             >
-              UNLOCK INSTANTLY FOR $3.99
+              UNLOCK INSTANTLY FOR $4.99
             </a>
 
             <button
@@ -1687,7 +1687,7 @@ export default function Home() {
                   </span>
                 </div>
               </div>
-              <span style={{ fontSize: "13px", fontWeight: "900" }}>{isProUser ? "✓" : "$3.99"}</span>
+              <span style={{ fontSize: "13px", fontWeight: "900" }}>{isProUser ? "✓" : "$4.99"}</span>
             </a>
           </div>
         </div>
