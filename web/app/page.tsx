@@ -713,7 +713,7 @@ export default function Home() {
             </p>
 
             <a
-              href={https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04}
+              href={"https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04"}
               style={{
                 display: "block",
                 width: "100%",
