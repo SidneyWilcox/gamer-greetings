@@ -115,6 +115,19 @@ function getStatTitle(type: "apm" | "luck" | "salt" | "tiltRes", val: number): s
 
 const sanitizeHandle = (val: string) => val.replace(/^@+/, "").trim();
 
+// Vector Bat Particle Component
+const BatIcon = ({ color, size = 18 }: { color: string; size?: number }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill={color}
+    style={{ filter: `drop-shadow(0 0 6px ${color})` }}
+  >
+    <path d="M12 4.5C10.5 6 9 7 7 7C4.5 7 2 5.5 1 4C1 8 3 13 8 13C9 13 10 12.5 11 12L11 15C10 16 9 17 9 19L12 17.5L15 19C15 17 14 16 13 15L13 12C14 12.5 15 13 16 13C21 13 23 8 23 4C22 5.5 19.5 7 17 7C15 7 13.5 6 12 4.5Z" />
+  </svg>
+);
+
 export default function Home() {
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const [isProUser, setIsProUser] = useState(false);
@@ -206,7 +219,6 @@ export default function Home() {
           setIsProUser(unlocked);
         }
 
-        // Handle Vault Theme Drops Unlock via Query Param (?unlocked_theme=)
         const unlockedThemeParam = params.get("unlocked_theme");
         const storedVault = localStorage.getItem("gg_unlocked_themes");
         let parsedVault: string[] = storedVault ? JSON.parse(storedVault) : [];
@@ -680,6 +692,7 @@ export default function Home() {
 
   const halloweenDrop = VAULT_DROPS.find((v) => v.id === "blood_moon_halloween")!;
   const isHalloweenUnlocked = unlockedThemes.includes("blood_moon_halloween");
+  const isHalloweenThemeActive = activeVaultTheme === "blood_moon_halloween";
 
   return (
     <main
@@ -728,6 +741,26 @@ export default function Home() {
           20% { opacity: 0.85; }
           80% { opacity: 0.75; }
           100% { transform: translateY(-520px) translateX(-20px); opacity: 0; }
+        }
+        @keyframes batFlap1 {
+          0% { transform: translateY(0) translateX(0) scale(0.8) rotate(-10deg); opacity: 0; }
+          20% { opacity: 0.95; transform: translateY(-100px) translateX(25px) scale(1) rotate(12deg); }
+          50% { transform: translateY(-260px) translateX(-15px) scale(0.9) rotate(-15deg); }
+          80% { opacity: 0.85; transform: translateY(-400px) translateX(30px) scale(1.1) rotate(8deg); }
+          100% { transform: translateY(-520px) translateX(45px) scale(0.7) rotate(-5deg); opacity: 0; }
+        }
+        @keyframes batFlap2 {
+          0% { transform: translateY(0) translateX(0) scale(1) rotate(15deg); opacity: 0; }
+          25% { opacity: 1; transform: translateY(-130px) translateX(-35px) scale(0.85) rotate(-18deg); }
+          60% { transform: translateY(-310px) translateX(20px) scale(1.05) rotate(14deg); }
+          85% { opacity: 0.9; transform: translateY(-440px) translateX(-25px) scale(0.9) rotate(-10deg); }
+          100% { transform: translateY(-530px) translateX(-40px) scale(0.6) rotate(10deg); opacity: 0; }
+        }
+        @keyframes batFlap3 {
+          0% { transform: translateY(0) translateX(0) scale(0.7) rotate(-8deg); opacity: 0; }
+          30% { opacity: 0.9; transform: translateY(-160px) translateX(20px) scale(0.95) rotate(10deg); }
+          70% { opacity: 0.8; transform: translateY(-360px) translateX(-10px) scale(0.85) rotate(-12deg); }
+          100% { transform: translateY(-510px) translateX(25px) scale(0.6) rotate(5deg); opacity: 0; }
         }
       `}</style>
 
@@ -1218,7 +1251,7 @@ export default function Home() {
                   cursor: "pointer",
                 }}
               >
-                {activeVaultTheme === "blood_moon_halloween" ? "✓ ACTIVE VAULT THEME" : "EQUIP BLOOD MOON '26"}
+                {activeVaultTheme === "blood_moon_halloween" ? "✓ ACTIVE VAULT THEME (BATS EQUIPPED)" : "EQUIP BLOOD MOON '26"}
               </button>
             ) : (
               <a
@@ -1933,12 +1966,29 @@ export default function Home() {
                   }}
                 />
 
-                {/* Cyber / Ember Particles */}
+                {/* Particle Aura: Bats for Blood Moon / Cyber Shaders for Standard */}
                 <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 2 }}>
-                  <div style={{ position: "absolute", bottom: "-10px", left: "15%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.accent, boxShadow: `0 0 8px ${theme.accent}`, animation: "floatUp1 3.2s infinite linear" }} />
-                  <div style={{ position: "absolute", bottom: "-10px", left: "40%", width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#c084fc", boxShadow: "0 0 10px #c084fc", animation: "floatUp2 4.0s infinite linear 0.6s" }} />
-                  <div style={{ position: "absolute", bottom: "-10px", left: "70%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.accent, boxShadow: `0 0 8px ${theme.accent}`, animation: "floatUp3 3.0s infinite linear 1.2s" }} />
-                  <div style={{ position: "absolute", bottom: "-10px", left: "88%", width: "3px", height: "3px", borderRadius: "50%", backgroundColor: "#facc15", boxShadow: "0 0 6px #facc15", animation: "floatUp4 3.6s infinite linear 0.4s" }} />
+                  {isHalloweenThemeActive ? (
+                    <>
+                      <div style={{ position: "absolute", bottom: "-20px", left: "10%", animation: "batFlap1 4.5s infinite linear" }}>
+                        <BatIcon color="#ff3b00" size={18} />
+                      </div>
+                      <div style={{ position: "absolute", bottom: "-20px", left: "65%", animation: "batFlap2 5.2s infinite linear 1.1s" }}>
+                        <BatIcon color="#ea580c" size={22} />
+                      </div>
+                      <div style={{ position: "absolute", bottom: "-20px", left: "38%", animation: "batFlap3 4.0s infinite linear 2.0s" }}>
+                        <BatIcon color="#7f1d1d" size={14} />
+                      </div>
+                      <div style={{ position: "absolute", bottom: "-10px", left: "82%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#ff3b00", boxShadow: "0 0 10px #ff3b00", animation: "floatUp1 3.2s infinite linear 0.5s" }} />
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ position: "absolute", bottom: "-10px", left: "15%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.accent, boxShadow: `0 0 8px ${theme.accent}`, animation: "floatUp1 3.2s infinite linear" }} />
+                      <div style={{ position: "absolute", bottom: "-10px", left: "40%", width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#c084fc", boxShadow: "0 0 10px #c084fc", animation: "floatUp2 4.0s infinite linear 0.6s" }} />
+                      <div style={{ position: "absolute", bottom: "-10px", left: "70%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.accent, boxShadow: `0 0 8px ${theme.accent}`, animation: "floatUp3 3.0s infinite linear 1.2s" }} />
+                      <div style={{ position: "absolute", bottom: "-10px", left: "88%", width: "3px", height: "3px", borderRadius: "50%", backgroundColor: "#facc15", boxShadow: "0 0 6px #facc15", animation: "floatUp4 3.6s infinite linear 0.4s" }} />
+                    </>
+                  )}
                 </div>
 
                 {isHovered && (
@@ -2225,7 +2275,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Global Leaderboard with Duel Buttons */}
+      {/* Global Leaderboard */}
       <div
         style={{
           marginTop: "48px",
