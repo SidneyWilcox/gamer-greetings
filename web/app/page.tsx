@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { toPng } from "html-to-image";
 import { supabase } from "./supabase";
 import { sound } from "./audio";
+import { VAULT_DROPS, VaultTheme } from "./themes.config";
 
 const STRIPE_PRO_LINK = "https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04";
 
@@ -37,6 +38,7 @@ interface GamerCard {
   twitch_handle?: string;
   created_at?: string;
   is_pro?: boolean;
+  unlocked_themes?: string[];
 }
 
 const CLASS_ROLES = [
@@ -118,6 +120,10 @@ export default function Home() {
   const [isProUser, setIsProUser] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
 
+  // Vault Drop State
+  const [unlockedThemes, setUnlockedThemes] = useState<string[]>([]);
+  const [activeVaultTheme, setActiveVaultTheme] = useState<string | null>(null);
+
   const [username, setUsername] = useState("PLAYER_ONE");
   const [vanitySlug, setVanitySlug] = useState("");
   const [bio, setBio] = useState("Clutch or kick. Always clicking heads.");
@@ -175,7 +181,7 @@ export default function Home() {
   const cardWrapperRef = useRef<HTMLDivElement>(null);
   const prevHoloRef = useRef(false);
 
-  // Verify Pro Status & Read URL Return Parameters (including ?tag= & ?game=) on Mount
+  // Verify Pro Status, Vault Themes & Read URL Parameters
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
@@ -195,10 +201,26 @@ export default function Home() {
           localStorage.setItem("gg_pro_unlocked", "true");
           setIsProUser(true);
           sound.playPowerUp();
-          window.history.replaceState({}, document.title, window.location.pathname);
         } else {
           const unlocked = localStorage.getItem("gg_pro_unlocked") === "true";
           setIsProUser(unlocked);
+        }
+
+        // Handle Vault Theme Drops Unlock via Query Param (?unlocked_theme=)
+        const unlockedThemeParam = params.get("unlocked_theme");
+        const storedVault = localStorage.getItem("gg_unlocked_themes");
+        let parsedVault: string[] = storedVault ? JSON.parse(storedVault) : [];
+
+        if (unlockedThemeParam && !parsedVault.includes(unlockedThemeParam)) {
+          parsedVault = [...parsedVault, unlockedThemeParam];
+          localStorage.setItem("gg_unlocked_themes", JSON.stringify(parsedVault));
+          setActiveVaultTheme(unlockedThemeParam);
+          sound.playPowerUp();
+        }
+        setUnlockedThemes(parsedVault);
+
+        if (params.get("session_id") || params.get("pro") === "unlocked" || unlockedThemeParam) {
+          window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
 
@@ -227,6 +249,7 @@ export default function Home() {
         if (!params.get("game") && d.mainGame !== undefined) setMainGame(d.mainGame);
         if (d.selectedPerks !== undefined) setSelectedPerks(d.selectedPerks);
         if (d.proSkin !== undefined) setProSkin(d.proSkin);
+        if (d.activeVaultTheme !== undefined) setActiveVaultTheme(d.activeVaultTheme);
         if (d.discord !== undefined) setDiscord(d.discord);
         if (d.psn !== undefined) setPsn(d.psn);
         if (d.xbox !== undefined) setXbox(d.xbox);
@@ -262,6 +285,7 @@ export default function Home() {
       mainGame,
       selectedPerks,
       proSkin,
+      activeVaultTheme,
       discord,
       psn,
       xbox,
@@ -289,6 +313,7 @@ export default function Home() {
     mainGame,
     selectedPerks,
     proSkin,
+    activeVaultTheme,
     discord,
     psn,
     xbox,
@@ -300,8 +325,9 @@ export default function Home() {
     const hoursBonus = Math.min(Math.floor(Math.sqrt(hoursPlayed) * 2), 60);
     const perkBonus = selectedPerks.length * 10;
     const proSkinBonus = isProUser && proSkin !== "standard" ? 15 : 0;
+    const vaultThemeBonus = activeVaultTheme ? 20 : 0;
     const score = Math.round(
-      apm * 1.3 + winRate * 1.6 + clutchRate * 1.1 + tiltRes * 0.4 + hoursBonus + perkBonus + proSkinBonus
+      apm * 1.3 + winRate * 1.6 + clutchRate * 1.1 + tiltRes * 0.4 + hoursBonus + perkBonus + proSkinBonus + vaultThemeBonus
     );
 
     let tier = "BRONZE NOOB";
@@ -311,7 +337,7 @@ export default function Home() {
     else if (score >= 140) tier = "🥈 SILVER GRINDER";
 
     return { powerLevel: score, rankTier: tier, isHolo: score >= 400 };
-  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed, selectedPerks, proSkin, isProUser]);
+  }, [apm, winRate, clutchRate, tiltRes, hoursPlayed, selectedPerks, proSkin, isProUser, activeVaultTheme]);
 
   useEffect(() => {
     if (isHolo && !prevHoloRef.current) {
@@ -351,9 +377,12 @@ export default function Home() {
       setShowProModal(true);
       return;
     }
+    setActiveVaultTheme(null);
     setProSkin(skinId);
     sound.playTick(75);
   };
+
+  const currentVaultConfig = VAULT_DROPS.find((t) => t.id === activeVaultTheme);
 
   let themeName = "default";
   let theme = {
@@ -364,7 +393,17 @@ export default function Home() {
     badge: null as string | null,
   };
 
-  if (isProUser && proSkin === "obsidian") {
+  if (currentVaultConfig && unlockedThemes.includes(currentVaultConfig.id)) {
+    themeName = currentVaultConfig.id;
+    theme = {
+      bg: currentVaultConfig.bg,
+      border: currentVaultConfig.border,
+      glow: currentVaultConfig.glow,
+      accent: currentVaultConfig.accent,
+      badge: currentVaultConfig.badge,
+    };
+  } else if (isProUser && proSkin === "obsidian") {
+    themeName = "obsidian";
     theme = {
       bg: "#040407",
       border: "2px solid #a855f7",
@@ -373,6 +412,7 @@ export default function Home() {
       badge: "🔮 OBSIDIAN PRO",
     };
   } else if (isProUser && proSkin === "gold") {
+    themeName = "gold";
     theme = {
       bg: "#080602",
       border: "2px solid #eab308",
@@ -381,6 +421,7 @@ export default function Home() {
       badge: "👑 24K GOLD PRO",
     };
   } else if (isProUser && proSkin === "matrix") {
+    themeName = "matrix";
     theme = {
       bg: "#020803",
       border: "2px solid #22c55e",
@@ -497,7 +538,7 @@ export default function Home() {
       hours_played: hoursPlayed,
       power_level: powerLevel,
       rank_tier: rankTier,
-      badge: isProUser ? theme.badge || "👑 PRO" : theme.badge,
+      badge: theme.badge,
       theme: themeName,
       avatar_url: avatarUrl,
       class_role: classRole,
@@ -509,6 +550,7 @@ export default function Home() {
       steam_handle: steam || undefined,
       twitch_handle: twitch || undefined,
       is_pro: isProUser,
+      unlocked_themes: unlockedThemes,
     };
 
     const { error } = await supabase.from("gamer_cards").insert([newCard]);
@@ -544,13 +586,14 @@ export default function Home() {
       hours_played: hoursPlayed,
       power_level: powerLevel,
       rank_tier: rankTier,
-      badge: isProUser ? theme.badge || "👑 PRO" : theme.badge,
+      badge: theme.badge,
       theme: themeName,
       avatar_url: avatarUrl,
       class_role: classRole,
       main_game: mainGame || "Valorant",
       perks: selectedPerks,
       is_pro: isProUser,
+      unlocked_themes: unlockedThemes,
     };
 
     const updated = [target, ...collection.filter((c) => c.username !== target.username)];
@@ -634,6 +677,9 @@ export default function Home() {
     ? vanitySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "")
     : username || "player";
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://gamergreetings.vercel.app/card/${liveTargetSlug}&color=${qrHex}&bgcolor=0a0a10`;
+
+  const halloweenDrop = VAULT_DROPS.find((v) => v.id === "blood_moon_halloween")!;
+  const isHalloweenUnlocked = unlockedThemes.includes("blood_moon_halloween");
 
   return (
     <main
@@ -767,7 +813,6 @@ export default function Home() {
       {/* Main Header with Inline SVG Bubble Logo */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 512 512"
@@ -949,6 +994,9 @@ export default function Home() {
                       if (c.class_role) setClassRole(c.class_role);
                       if (c.main_game) setMainGame(c.main_game);
                       if (c.perks) setSelectedPerks(c.perks);
+                      if (c.theme && VAULT_DROPS.some((v) => v.id === c.theme)) {
+                        setActiveVaultTheme(c.theme);
+                      }
                       sound.playPowerUp();
                     }}
                     style={{ cursor: "pointer" }}
@@ -1128,6 +1176,73 @@ export default function Home() {
             boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
           }}
         >
+          {/* Limited Vault Drop Box (Halloween '26) */}
+          <div
+            style={{
+              backgroundColor: "#160707",
+              border: "2px solid #ff3b00",
+              borderRadius: "12px",
+              padding: "14px",
+              boxShadow: "0 0 25px rgba(255, 59, 0, 0.25)",
+              marginBottom: "18px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ fontSize: "11px", fontWeight: "900", color: "#ff3b00", letterSpacing: "1px" }}>
+                {halloweenDrop.name}
+              </span>
+              <span style={{ fontSize: "9px", backgroundColor: "#ff3b0033", color: "#ff3b00", padding: "2px 6px", borderRadius: "4px", fontWeight: "bold" }}>
+                ENDS NOV 1
+              </span>
+            </div>
+
+            <p style={{ fontSize: "11px", color: "#ccc", margin: "0 0 10px 0", lineHeight: "1.4" }}>
+              {halloweenDrop.description}
+            </p>
+
+            {isHalloweenUnlocked ? (
+              <button
+                onClick={() => {
+                  setActiveVaultTheme(activeVaultTheme === "blood_moon_halloween" ? null : "blood_moon_halloween");
+                  sound.playPowerUp();
+                }}
+                style={{
+                  width: "100%",
+                  backgroundColor: activeVaultTheme === "blood_moon_halloween" ? "#ff3b00" : "#240a0a",
+                  color: activeVaultTheme === "blood_moon_halloween" ? "#000" : "#ff3b00",
+                  border: "1px solid #ff3b00",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: "900",
+                  cursor: "pointer",
+                }}
+              >
+                {activeVaultTheme === "blood_moon_halloween" ? "✓ ACTIVE VAULT THEME" : "EQUIP BLOOD MOON '26"}
+              </button>
+            ) : (
+              <a
+                href={halloweenDrop.stripeLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "block",
+                  textAlign: "center",
+                  backgroundColor: "#ff3b00",
+                  color: "#000",
+                  textDecoration: "none",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: "900",
+                  boxShadow: "0 0 15px rgba(255, 59, 0, 0.4)",
+                }}
+              >
+                CLAIM PERMANENT SKIN — {halloweenDrop.price}
+              </a>
+            )}
+          </div>
+
           {/* Player Tag */}
           <div style={{ marginBottom: "16px" }}>
             <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
@@ -1229,9 +1344,9 @@ export default function Home() {
                   key={s.id}
                   onClick={() => handleSkinSelect(s.id)}
                   style={{
-                    backgroundColor: proSkin === s.id && (isProUser || s.id === "standard") ? `${s.col}22` : "#1b1b24",
-                    border: proSkin === s.id && (isProUser || s.id === "standard") ? `2px solid ${s.col}` : "1px solid #282836",
-                    color: proSkin === s.id && (isProUser || s.id === "standard") ? s.col : s.locked ? "#777" : "#aaa",
+                    backgroundColor: proSkin === s.id && !activeVaultTheme && (isProUser || s.id === "standard") ? `${s.col}22` : "#1b1b24",
+                    border: proSkin === s.id && !activeVaultTheme && (isProUser || s.id === "standard") ? `2px solid ${s.col}` : "1px solid #282836",
+                    color: proSkin === s.id && !activeVaultTheme && (isProUser || s.id === "standard") ? s.col : s.locked ? "#777" : "#aaa",
                     borderRadius: "6px",
                     padding: "6px 8px",
                     fontSize: "10px",
@@ -1275,7 +1390,7 @@ export default function Home() {
             />
           </div>
 
-          {/* Main Game Selector with Custom Title Input */}
+          {/* Main Game Selector */}
           <div style={{ marginBottom: "16px" }}>
             <label style={{ fontSize: "11px", color: "#888", letterSpacing: "1px", display: "block", marginBottom: "8px" }}>
               CURRENT MAIN TITLE
@@ -1818,12 +1933,12 @@ export default function Home() {
                   }}
                 />
 
-                {/* Cyber Particles */}
+                {/* Cyber / Ember Particles */}
                 <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 2 }}>
-                  <div style={{ position: "absolute", bottom: "-10px", left: "15%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#06b6d4", boxShadow: "0 0 8px #06b6d4", animation: "floatUp1 3.2s infinite linear" }} />
+                  <div style={{ position: "absolute", bottom: "-10px", left: "15%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.accent, boxShadow: `0 0 8px ${theme.accent}`, animation: "floatUp1 3.2s infinite linear" }} />
                   <div style={{ position: "absolute", bottom: "-10px", left: "40%", width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#c084fc", boxShadow: "0 0 10px #c084fc", animation: "floatUp2 4.0s infinite linear 0.6s" }} />
-                  <div style={{ position: "absolute", bottom: "-10px", left: "70%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#f43f5e", boxShadow: "0 0 8px #f43f5e", animation: "floatUp3 3.0s infinite linear 1.2s" }} />
-                  <div style={{ position: "absolute", bottom: "-10px", left: "88%", width: "3px", height: "3px", borderRadius: "50%", backgroundColor: "#22c55e", boxShadow: "0 0 6px #22c55e", animation: "floatUp4 3.6s infinite linear 0.4s" }} />
+                  <div style={{ position: "absolute", bottom: "-10px", left: "70%", width: "4px", height: "4px", borderRadius: "50%", backgroundColor: theme.accent, boxShadow: `0 0 8px ${theme.accent}`, animation: "floatUp3 3.0s infinite linear 1.2s" }} />
+                  <div style={{ position: "absolute", bottom: "-10px", left: "88%", width: "3px", height: "3px", borderRadius: "50%", backgroundColor: "#facc15", boxShadow: "0 0 6px #facc15", animation: "floatUp4 3.6s infinite linear 0.4s" }} />
                 </div>
 
                 {isHovered && (
@@ -1877,7 +1992,7 @@ export default function Home() {
                   <div style={{ backgroundColor: isHolo ? "rgba(244,63,94,0.3)" : "rgba(0,0,0,0.6)", border: isHolo ? "1px solid rgba(244,63,94,0.7)" : "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(8px)" }}>
                     <div>
                       <span style={{ fontSize: "8px", color: "#ccc", letterSpacing: "1px", display: "block" }}>POWER LEVEL</span>
-                      <span style={{ fontSize: "16px", fontWeight: "900", color: isHolo ? "#f43f5e" : "#06b6d4" }}>
+                      <span style={{ fontSize: "16px", fontWeight: "900", color: theme.accent }}>
                         ⚡ {powerLevel}
                       </span>
                     </div>

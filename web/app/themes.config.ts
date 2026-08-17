@@ -10,21 +10,23 @@ export interface VaultTheme {
   glow: string;
   badge: string;
   description: string;
+  particleColors: string[];
 }
 
 export const VAULT_DROPS: VaultTheme[] = [
   {
-    id: "blood_moon",
-    name: "🩸 Blood Moon Glitch",
+    id: "blood_moon_halloween",
+    name: "🎃 BLOOD MOON '26",
     price: "$2.99",
-    stripeLink: "https://buy.stripe.com/example_blood_moon",
+    stripeLink: "https://buy.stripe.com/bJe6oAaB4alO1ne9DJefC04",
     availableUntil: "2026-11-01T23:59:59Z",
-    accent: "#ef4444",
-    bg: "#080202",
-    border: "2px solid #ef4444",
-    glow: "0 0 40px rgba(239, 68, 68, 0.65)",
-    badge: "🩸 VAULT '26",
-    description: "Limited-edition crimson glitch border and dark particle shaders.",
+    accent: "#ff3b00",
+    bg: "#060101",
+    border: "2px solid #ff3b00",
+    glow: "0 0 45px rgba(255, 59, 0, 0.75)",
+    badge: "🎃 HALLOWEEN '26",
+    description: "Limited Vault Drop: Haunted Jack-O-Lantern glow, blood-orange glitch border, and ember particle aura.",
+    particleColors: ["#ff3b00", "#ea580c", "#7f1d1d", "#facc15"],
   },
   {
     id: "cyber_frost",
@@ -38,5 +40,6 @@ export const VAULT_DROPS: VaultTheme[] = [
     glow: "0 0 40px rgba(56, 189, 248, 0.65)",
     badge: "❄️ FROST '26",
     description: "Sub-zero frosted glass edges with icy blue holographic particle sheen.",
+    particleColors: ["#38bdf8", "#06b6d4", "#67e8f9", "#ffffff"],
   },
 ];
