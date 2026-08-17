@@ -175,11 +175,22 @@ export default function Home() {
   const cardWrapperRef = useRef<HTMLDivElement>(null);
   const prevHoloRef = useRef(false);
 
-  // Verify Pro Status & Read URL Return Parameters on Mount
+  // Verify Pro Status & Read URL Return Parameters (including ?tag= & ?game=) on Mount
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
+
+        const incomingTag = params.get("tag");
+        if (incomingTag) {
+          setUsername(incomingTag.toUpperCase());
+        }
+
+        const incomingGame = params.get("game");
+        if (incomingGame) {
+          setMainGame(incomingGame);
+        }
+
         if (params.get("pro") === "unlocked" || params.get("session_id")) {
           localStorage.setItem("gg_pro_unlocked", "true");
           setIsProUser(true);
@@ -197,7 +208,8 @@ export default function Home() {
       const savedDraft = localStorage.getItem("gg_card_draft");
       if (savedDraft) {
         const d = JSON.parse(savedDraft);
-        if (d.username !== undefined) setUsername(d.username);
+        const params = new URLSearchParams(window.location.search);
+        if (!params.get("tag") && d.username !== undefined) setUsername(d.username);
         if (d.vanitySlug !== undefined) setVanitySlug(d.vanitySlug);
         if (d.bio !== undefined) setBio(d.bio);
         if (d.gpu !== undefined) setGpu(d.gpu);
@@ -212,7 +224,7 @@ export default function Home() {
         if (d.hoursPlayed !== undefined) setHoursPlayed(d.hoursPlayed);
         if (d.avatarUrl !== undefined) setAvatarUrl(d.avatarUrl);
         if (d.classRole !== undefined) setClassRole(d.classRole);
-        if (d.mainGame !== undefined) setMainGame(d.mainGame);
+        if (!params.get("game") && d.mainGame !== undefined) setMainGame(d.mainGame);
         if (d.selectedPerks !== undefined) setSelectedPerks(d.selectedPerks);
         if (d.proSkin !== undefined) setProSkin(d.proSkin);
         if (d.discord !== undefined) setDiscord(d.discord);
